@@ -1,12 +1,11 @@
 {
-  "name": "eth-trezor-keyring",
+  "name": "@rabby-wallet/eth-trezor-keyring",
   "version": "0.7.0",
   "description": "A MetaMask compatible keyring, for trezor hardware wallets",
   "keywords": [
     "ethereum",
     "keyring",
-    "trezor",
-    "metamask"
+    "trezor"
   ],
   "homepage": "https://github.com/metamask/eth-trezor-keyring#readme",
   "bugs": {
@@ -34,6 +33,7 @@
     "mocha/mkdirp": "^0.5.1"
   },
   "dependencies": {
+    "@bitgo/blake2b": "^3.0.1",
     "@ethereumjs/tx": "^3.1.4",
     "ethereumjs-util": "^7.0.9",
     "hdkey": "0.8.0",
