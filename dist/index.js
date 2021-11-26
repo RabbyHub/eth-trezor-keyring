@@ -129,17 +129,27 @@ class TrezorKeyring extends events_1.EventEmitter {
         return this.__getPage(-1);
     }
     getAddresses(start, end) {
-        const from = start;
-        const to = end;
-        const accounts = [];
-        for (let i = from; i < to; i++) {
-            const [address] = this._addressFromIndex(pathBase, i);
-            accounts.push({
-                address,
-                index: i,
+        return new Promise((resolve, reject) => {
+            this.unlock()
+                .then((_) => {
+                const from = start;
+                const to = end;
+                const accounts = [];
+                for (let i = from; i < to; i++) {
+                    const address = this._addressFromIndex(pathBase, i);
+                    accounts.push({
+                        address,
+                        balance: null,
+                        index: i,
+                    });
+                    this.paths[ethUtil.toChecksumAddress(address)] = i;
+                }
+                resolve(accounts);
+            })
+                .catch((e) => {
+                reject(e);
             });
-        }
-        return accounts;
+        });
     }
     __getPage(increment) {
         this.page += increment;
