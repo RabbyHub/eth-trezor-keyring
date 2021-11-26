@@ -122,7 +122,22 @@ class TrezorKeyring extends EventEmitter {
   getPreviousPage(): Promise<any> {
     return this.__getPage(-1);
   }
+  getAddresses(start: number, end: number) {
+    const from = start;
+    const to = end;
 
+    const accounts: any[] = [];
+
+    for (let i = from; i < to; i++) {
+      const [address] = this._addressFromIndex(pathBase,i);
+      accounts.push({
+        address,
+        index: i,
+      });
+    }
+
+    return accounts;
+  }
   __getPage(increment: number): Promise<any> {
     this.page += increment;
 
