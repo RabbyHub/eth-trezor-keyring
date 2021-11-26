@@ -44,7 +44,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.accounts = [];
         this.hdk = new hdkey_1.default();
         this.page = 0;
-        this.perPage = 5;
+        this.perPage = 10;
         this.unlockedAccount = 0;
         this.paths = {};
         this.hdPath = '';
@@ -127,6 +127,19 @@ class TrezorKeyring extends events_1.EventEmitter {
     }
     getPreviousPage() {
         return this.__getPage(-1);
+    }
+    getAddresses(start, end) {
+        const from = start;
+        const to = end;
+        const accounts = [];
+        for (let i = from; i < to; i++) {
+            const [address] = this._addressFromIndex(pathBase, i);
+            accounts.push({
+                address,
+                index: i,
+            });
+        }
+        return accounts;
     }
     __getPage(increment) {
         this.page += increment;
