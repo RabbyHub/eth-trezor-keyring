@@ -22,7 +22,7 @@ class TrezorKeyring extends EventEmitter {
   accounts: string[] = [];
   hdk = new HDKey();
   page = 0;
-  perPage = 5;
+  perPage = 10;
   unlockedAccount = 0;
   paths = {};
   hdPath = '';
