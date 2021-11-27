@@ -140,7 +140,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                     accounts.push({
                         address,
                         balance: null,
-                        index: i,
+                        index: i + 1,
                     });
                     this.paths[ethUtil.toChecksumAddress(address)] = i;
                 }
@@ -167,7 +167,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                     accounts.push({
                         address,
                         balance: null,
-                        index: i,
+                        index: i + 1,
                     });
                     this.paths[ethUtil.toChecksumAddress(address)] = i;
                 }
