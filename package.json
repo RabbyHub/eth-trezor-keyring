@@ -1,6 +1,6 @@
 {
   "name": "@rabby-wallet/eth-trezor-keyring",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A MetaMask compatible keyring, for trezor hardware wallets",
   "keywords": [
     "ethereum",
