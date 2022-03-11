@@ -19,6 +19,26 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -28,6 +48,7 @@ const ethUtil = __importStar(require("ethereumjs-util"));
 const ethereumjs_tx_1 = __importDefault(require("ethereumjs-tx"));
 const hdkey_1 = __importDefault(require("hdkey"));
 const trezor_connect_1 = __importDefault(require("trezor-connect"));
+const typedData_1 = __importDefault(require("trezor-connect/lib/plugins/ethereum/typedData"));
 const hdPathString = "m/44'/60'/0'/0";
 const keyringType = 'Trezor Hardware';
 const pathBase = 'm';
@@ -37,6 +58,9 @@ const TREZOR_CONNECT_MANIFEST = {
     email: 'support@debank.com/',
     appUrl: 'https://debank.com/',
 };
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 class TrezorKeyring extends events_1.EventEmitter {
     constructor(opts = {}) {
         super();
@@ -277,9 +301,41 @@ class TrezorKeyring extends events_1.EventEmitter {
             });
         });
     }
-    signTypedData() {
-        // Waiting on trezor to enable this
-        return Promise.reject(new Error('Not supported on this device'));
+    signTypedData(address, data, { version }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const dataWithHashes = (0, typedData_1.default)(data, version === 'V4');
+            // set default values for signTypedData
+            // Trezor is stricter than @metamask/eth-sig-util in what it accepts
+            const _a = dataWithHashes.types, _b = _a === void 0 ? {} : _a, { EIP712Domain = [] } = _b, otherTypes = __rest(_b, ["EIP712Domain"]), { message = {}, domain = {}, primaryType, 
+            // snake_case since Trezor uses Protobuf naming conventions here
+            domain_separator_hash, // eslint-disable-line camelcase
+            message_hash } = dataWithHashes;
+            // This is necessary to avoid popup collision
+            // between the unlock & sign trezor popups
+            const status = yield this.unlock();
+            yield wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
+            const params = {
+                path: this._pathFromAddress(address),
+                data: {
+                    types: Object.assign({ EIP712Domain }, otherTypes),
+                    message,
+                    domain,
+                    primaryType,
+                },
+                metamask_v4_compat: true,
+                // Trezor 1 only supports blindly signing hashes
+                domain_separator_hash,
+                message_hash,
+            };
+            const response = yield trezor_connect_1.default.ethereumSignTypedData(params);
+            if (response.success) {
+                if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
+                    throw new Error('signature doesnt match the right address');
+                }
+                return response.payload.signature;
+            }
+            throw new Error((response.payload && response.payload.error) || 'Unknown error');
+        });
     }
     exportAccount() {
         return Promise.reject(new Error('Not supported on this device'));

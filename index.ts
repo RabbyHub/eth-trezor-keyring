@@ -5,6 +5,7 @@ import * as ethUtil from 'ethereumjs-util';
 import Transaction from 'ethereumjs-tx';
 import HDKey from 'hdkey';
 import TrezorConnect from 'trezor-connect';
+import transformTypedData from 'trezor-connect/lib/plugins/ethereum/typedData';
 
 const hdPathString = "m/44'/60'/0'/0";
 const keyringType = 'Trezor Hardware';
@@ -15,6 +16,10 @@ const TREZOR_CONNECT_MANIFEST = {
   email: 'support@debank.com/',
   appUrl: 'https://debank.com/',
 };
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 class TrezorKeyring extends EventEmitter {
   static type = keyringType;
@@ -136,7 +141,7 @@ class TrezorKeyring extends EventEmitter {
             accounts.push({
               address,
               balance: null,
-              index: i+1,
+              index: i + 1,
             });
             this.paths[ethUtil.toChecksumAddress(address)] = i;
           }
@@ -167,7 +172,7 @@ class TrezorKeyring extends EventEmitter {
             accounts.push({
               address,
               balance: null,
-              index: i+1,
+              index: i + 1,
             });
             this.paths[ethUtil.toChecksumAddress(address)] = i;
           }
@@ -311,9 +316,50 @@ class TrezorKeyring extends EventEmitter {
     });
   }
 
-  signTypedData(): Promise<any> {
-    // Waiting on trezor to enable this
-    return Promise.reject(new Error('Not supported on this device'));
+  async signTypedData(address, data, { version }) {
+    const dataWithHashes = transformTypedData(data, version === 'V4');
+
+    // set default values for signTypedData
+    // Trezor is stricter than @metamask/eth-sig-util in what it accepts
+    const {
+      types: { EIP712Domain = [], ...otherTypes } = {},
+      message = {},
+      domain = {},
+      primaryType,
+      // snake_case since Trezor uses Protobuf naming conventions here
+      domain_separator_hash, // eslint-disable-line camelcase
+      message_hash, // eslint-disable-line camelcase
+    } = dataWithHashes;
+
+    // This is necessary to avoid popup collision
+    // between the unlock & sign trezor popups
+    const status = await this.unlock();
+    await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
+    const params = {
+      path: this._pathFromAddress(address),
+      data: {
+        types: { EIP712Domain, ...otherTypes },
+        message,
+        domain,
+        primaryType,
+      },
+      metamask_v4_compat: true,
+      // Trezor 1 only supports blindly signing hashes
+      domain_separator_hash,
+      message_hash,
+    };
+    const response = await TrezorConnect.ethereumSignTypedData(params);
+
+    if (response.success) {
+      if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
+        throw new Error('signature doesnt match the right address');
+      }
+      return response.payload.signature;
+    }
+
+    throw new Error(
+      (response.payload && response.payload.error) || 'Unknown error'
+    );
   }
 
   exportAccount(): Promise<any> {
