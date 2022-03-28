@@ -27,7 +27,7 @@ class TrezorKeyring extends EventEmitter {
   accounts: string[] = [];
   hdk = new HDKey();
   page = 0;
-  perPage = 10;
+  perPage = 5;
   unlockedAccount = 0;
   paths = {};
   hdPath = '';
@@ -53,7 +53,7 @@ class TrezorKeyring extends EventEmitter {
     this.hdPath = opts.hdPath || hdPathString;
     this.accounts = opts.accounts || [];
     this.page = opts.page || 0;
-    this.perPage = 10;
+    this.perPage = 5;
     return Promise.resolve();
   }
 

@@ -68,7 +68,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.accounts = [];
         this.hdk = new hdkey_1.default();
         this.page = 0;
-        this.perPage = 10;
+        this.perPage = 5;
         this.unlockedAccount = 0;
         this.paths = {};
         this.hdPath = '';
@@ -89,7 +89,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.hdPath = opts.hdPath || hdPathString;
         this.accounts = opts.accounts || [];
         this.page = opts.page || 0;
-        this.perPage = 10;
+        this.perPage = 5;
         return Promise.resolve();
     }
     isUnlocked() {
