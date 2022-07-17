@@ -303,6 +303,7 @@ class TrezorKeyring extends events_1.EventEmitter {
     }
     signTypedData(address, data, { version }) {
         return __awaiter(this, void 0, void 0, function* () {
+            yield wait(500);
             const dataWithHashes = (0, typedData_1.default)(data, version === 'V4');
             // set default values for signTypedData
             // Trezor is stricter than @metamask/eth-sig-util in what it accepts

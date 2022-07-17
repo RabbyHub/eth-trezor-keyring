@@ -317,6 +317,7 @@ class TrezorKeyring extends EventEmitter {
   }
 
   async signTypedData(address, data, { version }) {
+    await wait(500);
     const dataWithHashes = transformTypedData(data, version === 'V4');
 
     // set default values for signTypedData
