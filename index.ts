@@ -227,7 +227,7 @@ class TrezorKeyring extends EventEmitter {
             accounts.push({
               address,
               balance: null,
-              index: i,
+              index: i + 1,
             });
             this.paths[ethUtil.toChecksumAddress(address)] = i;
           }
@@ -495,24 +495,24 @@ class TrezorKeyring extends EventEmitter {
    *
    * @param {string} hdPath - The HD path to set.
    */
-  setHdPath(hdPath) {
-    if (!ALLOWED_HD_PATHS[hdPath]) {
-      throw new Error(
-        `The setHdPath method does not support setting HD Path to ${hdPath}`,
-      );
-    }
+  // setHdPath(hdPath) {
+  //   if (!ALLOWED_HD_PATHS[hdPath]) {
+  //     throw new Error(
+  //       `The setHdPath method does not support setting HD Path to ${hdPath}`,
+  //     );
+  //   }
 
-    // Reset HDKey if the path changes
-    if (this.hdPath !== hdPath) {
-      this.hdk = new HDKey();
-      this.accounts = [];
-      this.page = 0;
-      this.perPage = 5;
-      this.unlockedAccount = 0;
-      this.paths = {};
-    }
-    this.hdPath = hdPath;
-  }
+  //   // Reset HDKey if the path changes
+  //   if (this.hdPath !== hdPath) {
+  //     this.hdk = new HDKey();
+  //     this.accounts = [];
+  //     this.page = 0;
+  //     this.perPage = 5;
+  //     this.unlockedAccount = 0;
+  //     this.paths = {};
+  //   }
+  //   this.hdPath = hdPath;
+  // }
 
   /* PRIVATE METHODS */
 
