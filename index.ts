@@ -2,7 +2,7 @@
 
 import { EventEmitter } from 'events';
 import * as ethUtil from 'ethereumjs-util';
-import { TransactionFactory }  from '@ethereumjs/tx';
+import { TransactionFactory } from '@ethereumjs/tx';
 import HDKey from 'hdkey';
 import TrezorConnect from 'trezor-connect';
 import transformTypedData from 'trezor-connect/lib/plugins/ethereum/typedData';
@@ -45,7 +45,7 @@ function wait(ms) {
  * @param {TypedTransaction | OldEthJsTransaction} tx
  * @returns {tx is OldEthJsTransaction} Returns `true` if tx is an old-style ethereumjs-tx transaction.
  */
- function isOldStyleEthereumjsTx(tx) {
+function isOldStyleEthereumjsTx(tx) {
   return typeof tx.getChainId === 'function';
 }
 
@@ -88,6 +88,10 @@ class TrezorKeyring extends EventEmitter {
     // This method is not well documented, but the code it calls can be seen
     // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
     TrezorConnect.dispose();
+  }
+
+  cleanUp() {
+    this.hdk = new HDKey();
   }
 
   serialize() {
@@ -205,7 +209,6 @@ class TrezorKeyring extends EventEmitter {
         });
     });
   }
-
 
   __getPage(increment: number): Promise<any> {
     this.page += increment;
