@@ -121,6 +121,9 @@ class TrezorKeyring extends events_1.EventEmitter {
         // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
         trezor_connect_1.default.dispose();
     }
+    cleanUp() {
+        this.hdk = new hdkey_1.default();
+    }
     serialize() {
         return Promise.resolve({
             hdPath: this.hdPath,
