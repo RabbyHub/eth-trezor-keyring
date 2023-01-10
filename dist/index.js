@@ -490,6 +490,9 @@ class TrezorKeyring extends events_1.EventEmitter {
         return ethUtil.toChecksumAddress(`0x${address}`);
     }
     _pathFromAddress(address) {
+        return `${this.hdPath}/${this.indexFromAddress(address)}`;
+    }
+    indexFromAddress(address) {
         const checksummedAddress = ethUtil.toChecksumAddress(address);
         let index = this.paths[checksummedAddress];
         if (typeof index === 'undefined') {
@@ -503,7 +506,23 @@ class TrezorKeyring extends events_1.EventEmitter {
         if (typeof index === 'undefined') {
             throw new Error('Unknown address');
         }
-        return `${this.hdPath}/${index}`;
+        return index;
+    }
+    getCurrentAccounts() {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.unlock();
+            const addresses = yield this.getAccounts();
+            const accounts = [];
+            for (let i = 0; i < addresses.length; i++) {
+                const address = addresses[i];
+                const account = {
+                    address,
+                    index: this.indexFromAddress(address) + 1,
+                };
+                accounts.push(account);
+            }
+            return accounts;
+        });
     }
 }
 TrezorKeyring.type = keyringType;
