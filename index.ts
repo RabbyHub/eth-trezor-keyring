@@ -23,6 +23,11 @@ const ALLOWED_HD_PATHS = {
   [SLIP0044TestnetPath]: true,
 };
 
+interface Account {
+  address: string;
+  index: number;
+}
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -532,7 +537,11 @@ class TrezorKeyring extends EventEmitter {
     return ethUtil.toChecksumAddress(`0x${address}`);
   }
 
-  _pathFromAddress(address) {
+  _pathFromAddress(address: string): string {
+    return `${this.hdPath}/${this.indexFromAddress(address)}`;
+  }
+
+  private indexFromAddress(address: string) {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
     let index = this.paths[checksummedAddress];
     if (typeof index === 'undefined') {
@@ -547,7 +556,25 @@ class TrezorKeyring extends EventEmitter {
     if (typeof index === 'undefined') {
       throw new Error('Unknown address');
     }
-    return `${this.hdPath}/${index}`;
+    return index;
+  }
+
+  async getCurrentAccounts() {
+    await this.unlock();
+    const addresses = await this.getAccounts();
+
+    const accounts: Account[] = [];
+
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      const account = {
+        address,
+        index: this.indexFromAddress(address) + 1,
+      };
+      accounts.push(account);
+    }
+
+    return accounts;
   }
 }
 
