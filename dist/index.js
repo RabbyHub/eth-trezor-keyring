@@ -135,6 +135,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         });
     }
     deserialize(opts = {}) {
+        this.paths = opts.paths || {};
         this.hdPath = opts.hdPath || hdPathString;
         this.accounts = opts.accounts || [];
         this.page = opts.page || 0;

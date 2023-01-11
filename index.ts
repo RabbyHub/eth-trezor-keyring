@@ -111,6 +111,7 @@ class TrezorKeyring extends EventEmitter {
   }
 
   deserialize(opts: any = {}): Promise<void> {
+    this.paths = opts.paths || {};
     this.hdPath = opts.hdPath || hdPathString;
     this.accounts = opts.accounts || [];
     this.page = opts.page || 0;
@@ -541,7 +542,7 @@ class TrezorKeyring extends EventEmitter {
     return `${this.hdPath}/${this.indexFromAddress(address)}`;
   }
 
-  private indexFromAddress(address: string) {
+  indexFromAddress(address: string) {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
     let index = this.paths[checksummedAddress];
     if (typeof index === 'undefined') {
