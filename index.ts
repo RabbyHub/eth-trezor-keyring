@@ -568,11 +568,15 @@ class TrezorKeyring extends EventEmitter {
 
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
-      const account = {
-        address,
-        index: this.indexFromAddress(address) + 1,
-      };
-      accounts.push(account);
+      try {
+        const account = {
+          address,
+          index: this.indexFromAddress(address) + 1,
+        };
+        accounts.push(account);
+      } catch (e) {
+        console.log('address not found', address);
+      }
     }
 
     return accounts;
