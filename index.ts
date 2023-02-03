@@ -23,9 +23,17 @@ const ALLOWED_HD_PATHS = {
   [SLIP0044TestnetPath]: true,
 };
 
+const isSameAddress = (a: string, b: string) => {
+  return a.toLowerCase() === b.toLowerCase();
+};
+
 interface Account {
   address: string;
   index: number;
+}
+
+interface AccountDetail {
+  hdPathBasePublicKey?: string;
 }
 
 function wait(ms) {
@@ -65,9 +73,11 @@ class TrezorKeyring extends EventEmitter {
   paths = {};
   hdPath = '';
   model: string = '';
+  accountDetails: Record<string, AccountDetail>;
 
   constructor(opts = {}) {
     super();
+    this.accountDetails = {};
     this.deserialize(opts);
 
     TrezorConnect.on('DEVICE_EVENT', (event) => {
@@ -107,6 +117,7 @@ class TrezorKeyring extends EventEmitter {
       paths: this.paths,
       perPage: this.perPage,
       unlockedAccount: this.unlockedAccount,
+      accountDetails: this.accountDetails,
     });
   }
 
@@ -116,6 +127,7 @@ class TrezorKeyring extends EventEmitter {
     this.accounts = opts.accounts || [];
     this.page = opts.page || 0;
     this.perPage = opts.perPage || 5;
+    this.accountDetails = opts.accountDetails || {};
     return Promise.resolve();
   }
 
@@ -262,6 +274,9 @@ class TrezorKeyring extends EventEmitter {
     this.accounts = this.accounts.filter(
       (a) => a.toLowerCase() !== address.toLowerCase(),
     );
+    const checksummedAddress = ethUtil.toChecksumAddress(address);
+    delete this.accountDetails[checksummedAddress];
+    delete this.paths[checksummedAddress];
   }
 
   /**
@@ -563,11 +578,20 @@ class TrezorKeyring extends EventEmitter {
   async getCurrentAccounts() {
     await this.unlock();
     const addresses = await this.getAccounts();
+    const currentPublicKey = this.getPathBasePublicKey();
 
     const accounts: Account[] = [];
 
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
+      await this._fixAccountDetail(address);
+
+      const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
+
+      if (detail?.hdPathBasePublicKey !== currentPublicKey) {
+        continue;
+      }
+
       try {
         const account = {
           address,
@@ -580,6 +604,38 @@ class TrezorKeyring extends EventEmitter {
     }
 
     return accounts;
+  }
+
+  private getPathBasePublicKey() {
+    return this.hdk.publicKey.toString('hex');
+  }
+
+  private async _fixAccountDetail(address: string) {
+    const checksummedAddress = ethUtil.toChecksumAddress(address);
+    const detail = this.accountDetails[checksummedAddress];
+
+    // The detail is already fixed
+    if (detail?.hdPathBasePublicKey) {
+      return;
+    }
+
+    let addressInDevice;
+
+    try {
+      const index = this.indexFromAddress(address);
+      addressInDevice = this._addressFromIndex(pathBase, index);
+    } catch (e) {
+      console.log('address not found', address);
+    }
+
+    if (!addressInDevice || !isSameAddress(address, addressInDevice)) {
+      return;
+    }
+
+    this.accountDetails[checksummedAddress] = {
+      ...detail,
+      hdPathBasePublicKey: this.getPathBasePublicKey(),
+    };
   }
 }
 
