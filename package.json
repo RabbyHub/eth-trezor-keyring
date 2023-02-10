@@ -71,7 +71,24 @@
       "keccak": false,
       "secp256k1": false,
       "@lavamoat/preinstall-always-fail": false,
-      "core-js": false
+      "core-js": false,
+      "blake-hash": false,
+      "tiny-secp256k1": false,
+      "protobufjs": false,
+      "ethereumjs-tx>ethereumjs-util>keccak": false,
+      "ethereumjs-util>ethereum-cryptography>keccak": false,
+      "ethereumjs-util>ethereum-cryptography>secp256k1": false,
+      "hdkey>secp256k1": false,
+      "trezor-connect>@trezor/transport>protobufjs": false,
+      "trezor-connect>@trezor/utxo-lib>blake-hash": false,
+      "trezor-connect>@trezor/utxo-lib>tiny-secp256k1": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/transport>protobufjs": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/utxo-lib>blake-hash": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/utxo-lib>tiny-secp256k1": false,
+      "@ethereumjs/tx>ethereumjs-util>ethereum-cryptography>keccak": false,
+      "@ethereumjs/tx>ethereumjs-util>ethereum-cryptography>secp256k1": false,
+      "ethereumjs-tx>ethereumjs-util>ethereum-cryptography>keccak": false,
+      "ethereumjs-tx>ethereumjs-util>ethereum-cryptography>secp256k1": false
     }
   }
 }

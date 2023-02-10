@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import * as ethUtil from '@ethereumjs/util';
+import ethUtil from '@ethereumjs/util';
 import { TransactionFactory } from '@ethereumjs/tx';
 import HDKey from 'hdkey';
 import TrezorConnect from '@trezor/connect-web';
@@ -315,7 +315,7 @@ class TrezorKeyring extends EventEmitter {
     }
     return this._signTransaction(
       address,
-      Number(tx.common.chainId()),
+      tx.common.chainIdBN().toNumber(),
       tx,
       (payload) => {
         // Because tx will be immutable, first get a plain javascript object that
