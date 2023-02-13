@@ -1,4 +1,23 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -24,7 +43,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
-const util_1 = __importDefault(require("@ethereumjs/util"));
+const ethUtil = __importStar(require("ethereumjs-util"));
 const tx_1 = require("@ethereumjs/tx");
 const hdkey_1 = __importDefault(require("hdkey"));
 const connect_web_1 = __importDefault(require("@trezor/connect-web"));
@@ -211,7 +230,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                         balance: null,
                         index: i + 1,
                     });
-                    this.paths[util_1.default.toChecksumAddress(address)] = i;
+                    this.paths[ethUtil.toChecksumAddress(address)] = i;
                 }
                 resolve(accounts);
             })
@@ -238,7 +257,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                         balance: null,
                         index: i + 1,
                     });
-                    this.paths[util_1.default.toChecksumAddress(address)] = i;
+                    this.paths[ethUtil.toChecksumAddress(address)] = i;
                 }
                 resolve(accounts);
             })
@@ -255,7 +274,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             throw new Error(`Address ${address} not found in this keyring`);
         }
         this.accounts = this.accounts.filter((a) => a.toLowerCase() !== address.toLowerCase());
-        const checksummedAddress = util_1.default.toChecksumAddress(address);
+        const checksummedAddress = ethUtil.toChecksumAddress(address);
         delete this.accountDetails[checksummedAddress];
         delete this.paths[checksummedAddress];
     }
@@ -285,7 +304,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                 return tx;
             });
         }
-        return this._signTransaction(address, tx.common.chainIdBN().toNumber(), tx, (payload) => {
+        return this._signTransaction(address, Number(tx.common.chainId()), tx, (payload) => {
             // Because tx will be immutable, first get a plain javascript object that
             // represents the transaction. Using txData here as it aligns with the
             // nomenclature of ethereumjs/tx.
@@ -293,9 +312,9 @@ class TrezorKeyring extends events_1.EventEmitter {
             // The fromTxData utility expects a type to support transactions with a type other than 0
             txData.type = tx.type;
             // The fromTxData utility expects v,r and s to be hex prefixed
-            txData.v = util_1.default.addHexPrefix(payload.v);
-            txData.r = util_1.default.addHexPrefix(payload.r);
-            txData.s = util_1.default.addHexPrefix(payload.s);
+            txData.v = ethUtil.addHexPrefix(payload.v);
+            txData.r = ethUtil.addHexPrefix(payload.r);
+            txData.s = ethUtil.addHexPrefix(payload.s);
             // Adopt the 'common' option from the original transaction and set the
             // returned object to be frozen if the original is frozen.
             return tx_1.TransactionFactory.fromTxData(txData, {
@@ -345,8 +364,8 @@ class TrezorKeyring extends events_1.EventEmitter {
                 });
                 if (response.success) {
                     const newOrMutatedTx = handleSigning(response.payload);
-                    const addressSignedWith = util_1.default.toChecksumAddress(util_1.default.addHexPrefix(newOrMutatedTx.getSenderAddress().toString('hex')));
-                    const correctAddress = util_1.default.toChecksumAddress(address);
+                    const addressSignedWith = ethUtil.toChecksumAddress(ethUtil.addHexPrefix(newOrMutatedTx.getSenderAddress().toString('hex')));
+                    const correctAddress = ethUtil.toChecksumAddress(address);
                     if (addressSignedWith !== correctAddress) {
                         throw new Error("signature doesn't match the right address");
                     }
@@ -370,13 +389,13 @@ class TrezorKeyring extends events_1.EventEmitter {
                 setTimeout((_) => {
                     connect_web_1.default.ethereumSignMessage({
                         path: this._pathFromAddress(withAccount),
-                        message: util_1.default.stripHexPrefix(message),
+                        message: ethUtil.stripHexPrefix(message),
                         hex: true,
                     })
                         .then((response) => {
                         if (response.success) {
                             if (response.payload.address !==
-                                util_1.default.toChecksumAddress(withAccount)) {
+                                ethUtil.toChecksumAddress(withAccount)) {
                                 reject(new Error('signature doesnt match the right address'));
                             }
                             const signature = `0x${response.payload.signature}`;
@@ -430,7 +449,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                 message_hash,
             });
             if (response.success) {
-                if (util_1.default.toChecksumAddress(address) !== response.payload.address) {
+                if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
                     throw new Error('signature doesnt match the right address');
                 }
                 return response.payload.signature;
@@ -475,21 +494,21 @@ class TrezorKeyring extends events_1.EventEmitter {
     }
     /* PRIVATE METHODS */
     _normalize(buf) {
-        return util_1.default.bufferToHex(buf).toString();
+        return ethUtil.bufferToHex(buf).toString();
     }
     // eslint-disable-next-line no-shadow
     _addressFromIndex(pathBase, i) {
         const dkey = this.hdk.derive(`${pathBase}/${i}`);
-        const address = util_1.default
+        const address = ethUtil
             .publicToAddress(dkey.publicKey, true)
             .toString('hex');
-        return util_1.default.toChecksumAddress(`0x${address}`);
+        return ethUtil.toChecksumAddress(`0x${address}`);
     }
     _pathFromAddress(address) {
         return `${this.hdPath}/${this.indexFromAddress(address)}`;
     }
     indexFromAddress(address) {
-        const checksummedAddress = util_1.default.toChecksumAddress(address);
+        const checksummedAddress = ethUtil.toChecksumAddress(address);
         let index = this.paths[checksummedAddress];
         if (typeof index === 'undefined') {
             for (let i = 0; i < MAX_INDEX; i++) {
@@ -513,7 +532,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             for (let i = 0; i < addresses.length; i++) {
                 const address = addresses[i];
                 yield this._fixAccountDetail(address);
-                const detail = this.accountDetails[util_1.default.toChecksumAddress(address)];
+                const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
                 if ((detail === null || detail === void 0 ? void 0 : detail.hdPathBasePublicKey) !== currentPublicKey) {
                     continue;
                 }
@@ -536,7 +555,7 @@ class TrezorKeyring extends events_1.EventEmitter {
     }
     _fixAccountDetail(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const checksummedAddress = util_1.default.toChecksumAddress(address);
+            const checksummedAddress = ethUtil.toChecksumAddress(address);
             const detail = this.accountDetails[checksummedAddress];
             // The detail is already fixed
             if (detail === null || detail === void 0 ? void 0 : detail.hdPathBasePublicKey) {
