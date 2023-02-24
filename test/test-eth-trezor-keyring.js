@@ -9,7 +9,7 @@ const sinon = require('sinon');
 
 const EthereumTx = require('ethereumjs-tx');
 const HDKey = require('hdkey');
-const TrezorConnect = require('trezor-connect').default;
+const TrezorConnect = require('@trezor/connect-web').default;
 const { TransactionFactory } = require('@ethereumjs/tx');
 const Common = require('@ethereumjs/common').default;
 

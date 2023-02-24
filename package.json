@@ -23,27 +23,26 @@
   ],
   "scripts": {
     "build": "tsc",
-    "setup": "yarn install && yarn allow-scripts",
-    "test": "mocha",
-    "lint:eslint": "eslint . --cache --ext js,ts",
-    "lint:misc": "prettier '**/*.json' '**/*.md' '!CHANGELOG.md' '**/*.yml' --ignore-path .gitignore",
     "lint": "yarn lint:eslint && yarn lint:misc --check",
-    "lint:fix": "yarn lint:eslint --fix && yarn lint:misc --write"
+    "lint:eslint": "eslint . --cache --ext js,ts",
+    "lint:fix": "yarn lint:eslint --fix && yarn lint:misc --write",
+    "lint:misc": "prettier '**/*.json' '**/*.md' '!CHANGELOG.md' '**/*.yml' --ignore-path .gitignore",
+    "setup": "yarn install && yarn allow-scripts",
+    "test": "mocha"
   },
   "resolutions": {
     "mocha/mkdirp": "^0.5.1"
   },
   "dependencies": {
-    "@bitgo/blake2b": "^3.0.1",
-    "@ethereumjs/tx": "^3.1.4",
-    "@metamask/eth-sig-util": "^4.0.0",
-    "@trezor/rollout": "^1.2.0",
-    "ethereumjs-util": "^7.0.9",
-    "hdkey": "0.8.0",
-    "trezor-connect": "8.2.6-extended"
+    "@ethereumjs/tx": "3",
+    "@metamask/eth-sig-util": "5",
+    "@trezor/connect-plugin-ethereum": "^9.0.1",
+    "@trezor/connect-web": "^9.0.6",
+    "ethereumjs-util": "^7.1.5",
+    "hdkey": "0.8.0"
   },
   "devDependencies": {
-    "@ethereumjs/common": "^2.2.0",
+    "@ethereumjs/common": "2",
     "@lavamoat/allow-scripts": "^1.0.6",
     "@metamask/auto-changelog": "^2.3.0",
     "@metamask/eslint-config": "^8.0.0",
@@ -72,7 +71,24 @@
       "keccak": false,
       "secp256k1": false,
       "@lavamoat/preinstall-always-fail": false,
-      "core-js": false
+      "core-js": false,
+      "blake-hash": false,
+      "tiny-secp256k1": false,
+      "protobufjs": false,
+      "ethereumjs-tx>ethereumjs-util>keccak": false,
+      "ethereumjs-util>ethereum-cryptography>keccak": false,
+      "ethereumjs-util>ethereum-cryptography>secp256k1": false,
+      "hdkey>secp256k1": false,
+      "trezor-connect>@trezor/transport>protobufjs": false,
+      "trezor-connect>@trezor/utxo-lib>blake-hash": false,
+      "trezor-connect>@trezor/utxo-lib>tiny-secp256k1": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/transport>protobufjs": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/utxo-lib>blake-hash": false,
+      "@trezor/connect-web>@trezor/connect>@trezor/utxo-lib>tiny-secp256k1": false,
+      "@ethereumjs/tx>ethereumjs-util>ethereum-cryptography>keccak": false,
+      "@ethereumjs/tx>ethereumjs-util>ethereum-cryptography>secp256k1": false,
+      "ethereumjs-tx>ethereumjs-util>ethereum-cryptography>keccak": false,
+      "ethereumjs-tx>ethereumjs-util>ethereum-cryptography>secp256k1": false
     }
   }
 }

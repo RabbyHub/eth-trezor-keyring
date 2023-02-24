@@ -1,14 +1,18 @@
-// fork from https://github.com/MetaMask/eth-trezor-keyring/blob/main/index.js
-
 import { EventEmitter } from 'events';
 import * as ethUtil from 'ethereumjs-util';
 import { TransactionFactory } from '@ethereumjs/tx';
 import HDKey from 'hdkey';
-import TrezorConnect from 'trezor-connect';
-import transformTypedData from 'trezor-connect/lib/plugins/ethereum/typedData';
+import TrezorConnect from '@trezor/connect-web';
+import transformTypedData from '@trezor/connect-plugin-ethereum';
 
-const hdPathString = "m/44'/60'/0'/0";
+const hdPathString = `m/44'/60'/0'/0`;
 const SLIP0044TestnetPath = `m/44'/1'/0'/0`;
+
+const ALLOWED_HD_PATHS = {
+  [hdPathString]: true,
+  [SLIP0044TestnetPath]: true,
+};
+
 const keyringType = 'Trezor Hardware';
 const pathBase = 'm';
 const MAX_INDEX = 1000;
@@ -18,20 +22,13 @@ const TREZOR_CONNECT_MANIFEST = {
   appUrl: 'https://debank.com/',
 };
 
-const ALLOWED_HD_PATHS = {
-  [hdPathString]: true,
-  [SLIP0044TestnetPath]: true,
-};
-
 const isSameAddress = (a: string, b: string) => {
   return a.toLowerCase() === b.toLowerCase();
 };
-
 interface Account {
   address: string;
   index: number;
 }
-
 interface AccountDetail {
   hdPathBasePublicKey?: string;
 }
@@ -74,18 +71,31 @@ class TrezorKeyring extends EventEmitter {
   hdPath = '';
   model: string = '';
   accountDetails: Record<string, AccountDetail>;
+  trezorConnectInitiated: boolean;
 
   constructor(opts = {}) {
     super();
-    this.accountDetails = {};
+    this.type = keyringType;
+    this.accounts = [];
+    this.hdk = new HDKey();
+    this.page = 0;
+    this.perPage = 5;
+    this.unlockedAccount = 0;
+    this.paths = {};
     this.deserialize(opts);
+    this.trezorConnectInitiated = false;
+    this.accountDetails = {};
 
-    TrezorConnect.on('DEVICE_EVENT', (event) => {
+    TrezorConnect.on('DEVICE_EVENT', (event: any) => {
       if (event && event.payload && event.payload.features) {
         this.model = event.payload.features.model;
       }
     });
-    TrezorConnect.init({ manifest: TREZOR_CONNECT_MANIFEST });
+
+    if (!this.trezorConnectInitiated) {
+      TrezorConnect.init({ manifest: TREZOR_CONNECT_MANIFEST, lazyLoad: true });
+      this.trezorConnectInitiated = true;
+    }
   }
 
   /**
@@ -117,12 +127,10 @@ class TrezorKeyring extends EventEmitter {
       paths: this.paths,
       perPage: this.perPage,
       unlockedAccount: this.unlockedAccount,
-      accountDetails: this.accountDetails,
     });
   }
 
-  deserialize(opts: any = {}): Promise<void> {
-    this.paths = opts.paths || {};
+  deserialize(opts: any = {}) {
     this.hdPath = opts.hdPath || hdPathString;
     this.accounts = opts.accounts || [];
     this.page = opts.page || 0;
@@ -307,7 +315,7 @@ class TrezorKeyring extends EventEmitter {
     }
     return this._signTransaction(
       address,
-      tx.common.chainIdBN().toNumber(),
+      Number(tx.common.chainId()),
       tx,
       (payload) => {
         // Because tx will be immutable, first get a plain javascript object that
@@ -470,7 +478,7 @@ class TrezorKeyring extends EventEmitter {
     // between the unlock & sign trezor popups
     const status = await this.unlock();
     await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
-    const params = {
+    const response = await TrezorConnect.ethereumSignTypedData({
       path: this._pathFromAddress(address),
       data: {
         types: { EIP712Domain, ...otherTypes },
@@ -482,8 +490,7 @@ class TrezorKeyring extends EventEmitter {
       // Trezor 1 only supports blindly signing hashes
       domain_separator_hash,
       message_hash,
-    };
-    const response = await TrezorConnect.ethereumSignTypedData(params);
+    } as any);
 
     if (response.success) {
       if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
@@ -515,28 +522,28 @@ class TrezorKeyring extends EventEmitter {
    * If the given HD path is already the current HD path, nothing happens. Otherwise the new HD
    * path is set, and the wallet state is completely reset.
    *
-   * @throws {Error} Throws if the HD path is not supported.
+   * @throws {Error] Throws if the HD path is not supported.
    *
    * @param {string} hdPath - The HD path to set.
    */
-  // setHdPath(hdPath) {
-  //   if (!ALLOWED_HD_PATHS[hdPath]) {
-  //     throw new Error(
-  //       `The setHdPath method does not support setting HD Path to ${hdPath}`,
-  //     );
-  //   }
+  setHdPath(hdPath) {
+    if (!ALLOWED_HD_PATHS[hdPath]) {
+      throw new Error(
+        `The setHdPath method does not support setting HD Path to ${hdPath}`,
+      );
+    }
 
-  //   // Reset HDKey if the path changes
-  //   if (this.hdPath !== hdPath) {
-  //     this.hdk = new HDKey();
-  //     this.accounts = [];
-  //     this.page = 0;
-  //     this.perPage = 5;
-  //     this.unlockedAccount = 0;
-  //     this.paths = {};
-  //   }
-  //   this.hdPath = hdPath;
-  // }
+    // Reset HDKey if the path changes
+    if (this.hdPath !== hdPath) {
+      this.hdk = new HDKey();
+      this.accounts = [];
+      this.page = 0;
+      this.perPage = 5;
+      this.unlockedAccount = 0;
+      this.paths = {};
+    }
+    this.hdPath = hdPath;
+  }
 
   /* PRIVATE METHODS */
 

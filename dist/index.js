@@ -1,5 +1,4 @@
 "use strict";
-// fork from https://github.com/MetaMask/eth-trezor-keyring/blob/main/index.js
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
@@ -47,10 +46,14 @@ const events_1 = require("events");
 const ethUtil = __importStar(require("ethereumjs-util"));
 const tx_1 = require("@ethereumjs/tx");
 const hdkey_1 = __importDefault(require("hdkey"));
-const trezor_connect_1 = __importDefault(require("trezor-connect"));
-const typedData_1 = __importDefault(require("trezor-connect/lib/plugins/ethereum/typedData"));
-const hdPathString = "m/44'/60'/0'/0";
+const connect_web_1 = __importDefault(require("@trezor/connect-web"));
+const connect_plugin_ethereum_1 = __importDefault(require("@trezor/connect-plugin-ethereum"));
+const hdPathString = `m/44'/60'/0'/0`;
 const SLIP0044TestnetPath = `m/44'/1'/0'/0`;
+const ALLOWED_HD_PATHS = {
+    [hdPathString]: true,
+    [SLIP0044TestnetPath]: true,
+};
 const keyringType = 'Trezor Hardware';
 const pathBase = 'm';
 const MAX_INDEX = 1000;
@@ -58,10 +61,6 @@ const DELAY_BETWEEN_POPUPS = 1000;
 const TREZOR_CONNECT_MANIFEST = {
     email: 'support@debank.com/',
     appUrl: 'https://debank.com/',
-};
-const ALLOWED_HD_PATHS = {
-    [hdPathString]: true,
-    [SLIP0044TestnetPath]: true,
 };
 const isSameAddress = (a, b) => {
     return a.toLowerCase() === b.toLowerCase();
@@ -101,14 +100,25 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.paths = {};
         this.hdPath = '';
         this.model = '';
-        this.accountDetails = {};
+        this.type = keyringType;
+        this.accounts = [];
+        this.hdk = new hdkey_1.default();
+        this.page = 0;
+        this.perPage = 5;
+        this.unlockedAccount = 0;
+        this.paths = {};
         this.deserialize(opts);
-        trezor_connect_1.default.on('DEVICE_EVENT', (event) => {
+        this.trezorConnectInitiated = false;
+        this.accountDetails = {};
+        connect_web_1.default.on('DEVICE_EVENT', (event) => {
             if (event && event.payload && event.payload.features) {
                 this.model = event.payload.features.model;
             }
         });
-        trezor_connect_1.default.init({ manifest: TREZOR_CONNECT_MANIFEST });
+        if (!this.trezorConnectInitiated) {
+            connect_web_1.default.init({ manifest: TREZOR_CONNECT_MANIFEST, lazyLoad: true });
+            this.trezorConnectInitiated = true;
+        }
     }
     /**
      * Gets the model, if known.
@@ -123,7 +133,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         // This removes the Trezor Connect iframe from the DOM
         // This method is not well documented, but the code it calls can be seen
         // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
-        trezor_connect_1.default.dispose();
+        connect_web_1.default.dispose();
     }
     cleanUp() {
         this.hdk = new hdkey_1.default();
@@ -136,11 +146,9 @@ class TrezorKeyring extends events_1.EventEmitter {
             paths: this.paths,
             perPage: this.perPage,
             unlockedAccount: this.unlockedAccount,
-            accountDetails: this.accountDetails,
         });
     }
     deserialize(opts = {}) {
-        this.paths = opts.paths || {};
         this.hdPath = opts.hdPath || hdPathString;
         this.accounts = opts.accounts || [];
         this.page = opts.page || 0;
@@ -156,7 +164,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             return Promise.resolve('already unlocked');
         }
         return new Promise((resolve, reject) => {
-            trezor_connect_1.default.getPublicKey({
+            connect_web_1.default.getPublicKey({
                 path: this.hdPath,
                 coin: 'ETH',
             })
@@ -296,7 +304,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                 return tx;
             });
         }
-        return this._signTransaction(address, tx.common.chainIdBN().toNumber(), tx, (payload) => {
+        return this._signTransaction(address, Number(tx.common.chainId()), tx, (payload) => {
             // Because tx will be immutable, first get a plain javascript object that
             // represents the transaction. Using txData here as it aligns with the
             // nomenclature of ethereumjs/tx.
@@ -350,7 +358,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             try {
                 const status = yield this.unlock();
                 yield wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
-                const response = yield trezor_connect_1.default.ethereumSignTransaction({
+                const response = yield connect_web_1.default.ethereumSignTransaction({
                     path: this._pathFromAddress(address),
                     transaction,
                 });
@@ -379,7 +387,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             this.unlock()
                 .then((status) => {
                 setTimeout((_) => {
-                    trezor_connect_1.default.ethereumSignMessage({
+                    connect_web_1.default.ethereumSignMessage({
                         path: this._pathFromAddress(withAccount),
                         message: ethUtil.stripHexPrefix(message),
                         hex: true,
@@ -416,7 +424,7 @@ class TrezorKeyring extends events_1.EventEmitter {
     signTypedData(address, data, { version }) {
         return __awaiter(this, void 0, void 0, function* () {
             yield wait(500);
-            const dataWithHashes = (0, typedData_1.default)(data, version === 'V4');
+            const dataWithHashes = (0, connect_plugin_ethereum_1.default)(data, version === 'V4');
             // set default values for signTypedData
             // Trezor is stricter than @metamask/eth-sig-util in what it accepts
             const _a = dataWithHashes.types, _b = _a === void 0 ? {} : _a, { EIP712Domain = [] } = _b, otherTypes = __rest(_b, ["EIP712Domain"]), { message = {}, domain = {}, primaryType, 
@@ -427,7 +435,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             // between the unlock & sign trezor popups
             const status = yield this.unlock();
             yield wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
-            const params = {
+            const response = yield connect_web_1.default.ethereumSignTypedData({
                 path: this._pathFromAddress(address),
                 data: {
                     types: Object.assign({ EIP712Domain }, otherTypes),
@@ -439,8 +447,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                 // Trezor 1 only supports blindly signing hashes
                 domain_separator_hash,
                 message_hash,
-            };
-            const response = yield trezor_connect_1.default.ethereumSignTypedData(params);
+            });
             if (response.success) {
                 if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
                     throw new Error('signature doesnt match the right address');
@@ -466,27 +473,25 @@ class TrezorKeyring extends events_1.EventEmitter {
      * If the given HD path is already the current HD path, nothing happens. Otherwise the new HD
      * path is set, and the wallet state is completely reset.
      *
-     * @throws {Error} Throws if the HD path is not supported.
+     * @throws {Error] Throws if the HD path is not supported.
      *
      * @param {string} hdPath - The HD path to set.
      */
-    // setHdPath(hdPath) {
-    //   if (!ALLOWED_HD_PATHS[hdPath]) {
-    //     throw new Error(
-    //       `The setHdPath method does not support setting HD Path to ${hdPath}`,
-    //     );
-    //   }
-    //   // Reset HDKey if the path changes
-    //   if (this.hdPath !== hdPath) {
-    //     this.hdk = new HDKey();
-    //     this.accounts = [];
-    //     this.page = 0;
-    //     this.perPage = 5;
-    //     this.unlockedAccount = 0;
-    //     this.paths = {};
-    //   }
-    //   this.hdPath = hdPath;
-    // }
+    setHdPath(hdPath) {
+        if (!ALLOWED_HD_PATHS[hdPath]) {
+            throw new Error(`The setHdPath method does not support setting HD Path to ${hdPath}`);
+        }
+        // Reset HDKey if the path changes
+        if (this.hdPath !== hdPath) {
+            this.hdk = new hdkey_1.default();
+            this.accounts = [];
+            this.page = 0;
+            this.perPage = 5;
+            this.unlockedAccount = 0;
+            this.paths = {};
+        }
+        this.hdPath = hdPath;
+    }
     /* PRIVATE METHODS */
     _normalize(buf) {
         return ethUtil.bufferToHex(buf).toString();
