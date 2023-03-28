@@ -72,6 +72,8 @@ class TrezorKeyring extends EventEmitter {
   model: string = '';
   accountDetails: Record<string, AccountDetail>;
   trezorConnectInitiated: boolean;
+  isMultiDevice: boolean;
+  deviceId?: string;
 
   constructor(opts = {}) {
     super();
@@ -85,10 +87,26 @@ class TrezorKeyring extends EventEmitter {
     this.deserialize(opts);
     this.trezorConnectInitiated = false;
     this.accountDetails = {};
+    this.isMultiDevice = false;
 
     TrezorConnect.on('DEVICE_EVENT', (event: any) => {
       if (event && event.payload && event.payload.features) {
         this.model = event.payload.features.model;
+      }
+      const currentDeviceId = event.payload?.id;
+      if (event.type === 'device-disconnect') {
+        this.deviceId = undefined;
+      } else if (!this.deviceId) {
+        this.deviceId = currentDeviceId;
+      }
+      if (
+        this.deviceId &&
+        currentDeviceId &&
+        this.deviceId !== currentDeviceId
+      ) {
+        this.isMultiDevice = true;
+      } else {
+        this.isMultiDevice = false;
       }
     });
 
@@ -116,7 +134,12 @@ class TrezorKeyring extends EventEmitter {
   }
 
   cleanUp() {
-    this.hdk = new HDKey();
+    if (!this.hdk) {
+      return;
+    }
+    if (this.isMultiDevice) {
+      this.hdk = new HDKey();
+    }
   }
 
   serialize() {
@@ -127,6 +150,8 @@ class TrezorKeyring extends EventEmitter {
       paths: this.paths,
       perPage: this.perPage,
       unlockedAccount: this.unlockedAccount,
+      accountDetails: this.accountDetails,
+      deviceId: this.deviceId,
     });
   }
 
@@ -136,6 +161,8 @@ class TrezorKeyring extends EventEmitter {
     this.page = opts.page || 0;
     this.perPage = opts.perPage || 5;
     this.accountDetails = opts.accountDetails || {};
+    this.deviceId = opts.deviceId;
+
     return Promise.resolve();
   }
 
