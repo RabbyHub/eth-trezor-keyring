@@ -110,26 +110,20 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.deserialize(opts);
         this.trezorConnectInitiated = false;
         this.accountDetails = {};
-        this.isMultiDevice = false;
+        this.connectDevices = new Set();
         connect_web_1.default.on('DEVICE_EVENT', (event) => {
             var _a;
             if (event && event.payload && event.payload.features) {
                 this.model = event.payload.features.model;
             }
             const currentDeviceId = (_a = event.payload) === null || _a === void 0 ? void 0 : _a.id;
+            if (event.type === 'device-connect') {
+                this.connectDevices.add(currentDeviceId);
+                this.cleanUp(true);
+            }
             if (event.type === 'device-disconnect') {
-                this.deviceId = undefined;
-            }
-            else if (!this.deviceId) {
-                this.deviceId = currentDeviceId;
-            }
-            if (this.deviceId &&
-                currentDeviceId &&
-                this.deviceId !== currentDeviceId) {
-                this.isMultiDevice = true;
-            }
-            else {
-                this.isMultiDevice = false;
+                this.connectDevices.delete(currentDeviceId);
+                this.cleanUp(true);
             }
         });
         if (!this.trezorConnectInitiated) {
@@ -152,11 +146,11 @@ class TrezorKeyring extends events_1.EventEmitter {
         // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
         connect_web_1.default.dispose();
     }
-    cleanUp() {
+    cleanUp(force = false) {
         if (!this.hdk) {
             return;
         }
-        if (this.isMultiDevice) {
+        if (force || this.connectDevices.size > 1) {
             this.hdk = new hdkey_1.default();
         }
     }
@@ -169,7 +163,6 @@ class TrezorKeyring extends events_1.EventEmitter {
             perPage: this.perPage,
             unlockedAccount: this.unlockedAccount,
             accountDetails: this.accountDetails,
-            deviceId: this.deviceId,
         });
     }
     deserialize(opts = {}) {
@@ -178,7 +171,6 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.page = opts.page || 0;
         this.perPage = opts.perPage || 5;
         this.accountDetails = opts.accountDetails || {};
-        this.deviceId = opts.deviceId;
         return Promise.resolve();
     }
     isUnlocked() {
