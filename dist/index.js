@@ -110,9 +110,26 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.deserialize(opts);
         this.trezorConnectInitiated = false;
         this.accountDetails = {};
+        this.isMultiDevice = false;
         connect_web_1.default.on('DEVICE_EVENT', (event) => {
+            var _a;
             if (event && event.payload && event.payload.features) {
                 this.model = event.payload.features.model;
+            }
+            const currentDeviceId = (_a = event.payload) === null || _a === void 0 ? void 0 : _a.id;
+            if (event.type === 'device-disconnect') {
+                this.deviceId = undefined;
+            }
+            else if (!this.deviceId) {
+                this.deviceId = currentDeviceId;
+            }
+            if (this.deviceId &&
+                currentDeviceId &&
+                this.deviceId !== currentDeviceId) {
+                this.isMultiDevice = true;
+            }
+            else {
+                this.isMultiDevice = false;
             }
         });
         if (!this.trezorConnectInitiated) {
@@ -136,7 +153,12 @@ class TrezorKeyring extends events_1.EventEmitter {
         connect_web_1.default.dispose();
     }
     cleanUp() {
-        this.hdk = new hdkey_1.default();
+        if (!this.hdk) {
+            return;
+        }
+        if (this.isMultiDevice) {
+            this.hdk = new hdkey_1.default();
+        }
     }
     serialize() {
         return Promise.resolve({
@@ -146,6 +168,8 @@ class TrezorKeyring extends events_1.EventEmitter {
             paths: this.paths,
             perPage: this.perPage,
             unlockedAccount: this.unlockedAccount,
+            accountDetails: this.accountDetails,
+            deviceId: this.deviceId,
         });
     }
     deserialize(opts = {}) {
@@ -154,6 +178,7 @@ class TrezorKeyring extends events_1.EventEmitter {
         this.page = opts.page || 0;
         this.perPage = opts.perPage || 5;
         this.accountDetails = opts.accountDetails || {};
+        this.deviceId = opts.deviceId;
         return Promise.resolve();
     }
     isUnlocked() {
