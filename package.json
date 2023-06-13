@@ -36,6 +36,7 @@
   "dependencies": {
     "@ethereumjs/tx": "3",
     "@metamask/eth-sig-util": "5",
+    "@trezor/connect": "^9.0.11",
     "@trezor/connect-plugin-ethereum": "^9.0.1",
     "@trezor/connect-web": "^9.0.6",
     "ethereumjs-util": "^7.1.5",
