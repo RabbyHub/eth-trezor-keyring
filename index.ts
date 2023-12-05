@@ -29,8 +29,20 @@ interface Account {
   address: string;
   index: number;
 }
+
+export enum LedgerHDPathType {
+  LedgerLive = 'LedgerLive',
+  Legacy = 'Legacy',
+  BIP44 = 'BIP44',
+}
+
+type HDPathType = LedgerHDPathType;
+
 interface AccountDetail {
   hdPathBasePublicKey?: string;
+  hdPath: string;
+  hdPathType: HDPathType;
+  index: number;
 }
 
 function wait(ms) {
@@ -204,6 +216,12 @@ class TrezorKeyring extends EventEmitter {
             const address = this._addressFromIndex(pathBase, i);
             if (!this.accounts.includes(address)) {
               this.accounts.push(address);
+              this.accountDetails[address.toLowerCase()] = {
+                hdPath: this._pathFromAddress(address),
+                hdPathType: LedgerHDPathType.BIP44,
+                hdPathBasePublicKey: this.getPathBasePublicKey(),
+                index: i,
+              };
             }
             this.page = 0;
           }
@@ -584,7 +602,10 @@ class TrezorKeyring extends EventEmitter {
 
   indexFromAddress(address: string) {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
-    let index = this.paths[checksummedAddress];
+    let index =
+      this.paths[checksummedAddress] ||
+      this.accountDetails[address.toLowerCase()]?.index;
+
     if (typeof index === 'undefined') {
       for (let i = 0; i < MAX_INDEX; i++) {
         if (checksummedAddress === this._addressFromIndex(pathBase, i)) {
@@ -640,14 +661,14 @@ class TrezorKeyring extends EventEmitter {
     const detail = this.accountDetails[checksummedAddress];
 
     // The detail is already fixed
-    if (detail?.hdPathBasePublicKey) {
+    if (detail?.hdPathBasePublicKey && detail.hdPath) {
       return;
     }
 
     let addressInDevice;
-
+    let index;
     try {
-      const index = this.indexFromAddress(address);
+      index = this.indexFromAddress(address);
       addressInDevice = this._addressFromIndex(pathBase, index);
     } catch (e) {
       console.log('address not found', address);
@@ -659,6 +680,9 @@ class TrezorKeyring extends EventEmitter {
 
     this.accountDetails[checksummedAddress] = {
       ...detail,
+      index,
+      hdPath: this._pathFromAddress(address),
+      hdPathType: LedgerHDPathType.BIP44,
       hdPathBasePublicKey: this.getPathBasePublicKey(),
     };
   }
