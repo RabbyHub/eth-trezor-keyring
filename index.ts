@@ -216,7 +216,7 @@ class TrezorKeyring extends EventEmitter {
             const address = this._addressFromIndex(pathBase, i);
             if (!this.accounts.includes(address)) {
               this.accounts.push(address);
-              this.accountDetails[address.toLowerCase()] = {
+              this.accountDetails[ethUtil.toChecksumAddress(address)] = {
                 hdPath: this._pathFromAddress(address),
                 hdPathType: LedgerHDPathType.BIP44,
                 hdPathBasePublicKey: this.getPathBasePublicKey(),
@@ -604,7 +604,7 @@ class TrezorKeyring extends EventEmitter {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
     let index =
       this.paths[checksummedAddress] ||
-      this.accountDetails[address.toLowerCase()]?.index;
+      this.accountDetails[checksummedAddress]?.index;
 
     if (typeof index === 'undefined') {
       for (let i = 0; i < MAX_INDEX; i++) {
