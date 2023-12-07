@@ -42,6 +42,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.LedgerHDPathType = void 0;
 const events_1 = require("events");
 const ethUtil = __importStar(require("ethereumjs-util"));
 const tx_1 = require("@ethereumjs/tx");
@@ -65,6 +66,12 @@ const TREZOR_CONNECT_MANIFEST = {
 const isSameAddress = (a, b) => {
     return a.toLowerCase() === b.toLowerCase();
 };
+var LedgerHDPathType;
+(function (LedgerHDPathType) {
+    LedgerHDPathType["LedgerLive"] = "LedgerLive";
+    LedgerHDPathType["Legacy"] = "Legacy";
+    LedgerHDPathType["BIP44"] = "BIP44";
+})(LedgerHDPathType = exports.LedgerHDPathType || (exports.LedgerHDPathType = {}));
 function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -213,6 +220,12 @@ class TrezorKeyring extends events_1.EventEmitter {
                     const address = this._addressFromIndex(pathBase, i);
                     if (!this.accounts.includes(address)) {
                         this.accounts.push(address);
+                        this.accountDetails[ethUtil.toChecksumAddress(address)] = {
+                            hdPath: this._pathFromAddress(address),
+                            hdPathType: LedgerHDPathType.BIP44,
+                            hdPathBasePublicKey: this.getPathBasePublicKey(),
+                            index: i,
+                        };
                     }
                     this.page = 0;
                 }
@@ -525,8 +538,10 @@ class TrezorKeyring extends events_1.EventEmitter {
         return `${this.hdPath}/${this.indexFromAddress(address)}`;
     }
     indexFromAddress(address) {
+        var _a;
         const checksummedAddress = ethUtil.toChecksumAddress(address);
-        let index = this.paths[checksummedAddress];
+        let index = this.paths[checksummedAddress] ||
+            ((_a = this.accountDetails[checksummedAddress]) === null || _a === void 0 ? void 0 : _a.index);
         if (typeof index === 'undefined') {
             for (let i = 0; i < MAX_INDEX; i++) {
                 if (checksummedAddress === this._addressFromIndex(pathBase, i)) {
@@ -575,12 +590,13 @@ class TrezorKeyring extends events_1.EventEmitter {
             const checksummedAddress = ethUtil.toChecksumAddress(address);
             const detail = this.accountDetails[checksummedAddress];
             // The detail is already fixed
-            if (detail === null || detail === void 0 ? void 0 : detail.hdPathBasePublicKey) {
+            if ((detail === null || detail === void 0 ? void 0 : detail.hdPathBasePublicKey) && detail.hdPath) {
                 return;
             }
             let addressInDevice;
+            let index;
             try {
-                const index = this.indexFromAddress(address);
+                index = this.indexFromAddress(address);
                 addressInDevice = this._addressFromIndex(pathBase, index);
             }
             catch (e) {
@@ -589,7 +605,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             if (!addressInDevice || !isSameAddress(address, addressInDevice)) {
                 return;
             }
-            this.accountDetails[checksummedAddress] = Object.assign(Object.assign({}, detail), { hdPathBasePublicKey: this.getPathBasePublicKey() });
+            this.accountDetails[checksummedAddress] = Object.assign(Object.assign({}, detail), { index, hdPath: this._pathFromAddress(address), hdPathType: LedgerHDPathType.BIP44, hdPathBasePublicKey: this.getPathBasePublicKey() });
         });
     }
 }
