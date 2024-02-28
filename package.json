@@ -36,8 +36,8 @@
   "dependencies": {
     "@ethereumjs/tx": "3",
     "@metamask/eth-sig-util": "5",
-    "@trezor/connect-plugin-ethereum": "^9.0.1",
-    "@trezor/connect-web": "^9.0.6",
+    "@trezor/connect-plugin-ethereum": "^9.0.3",
+    "@trezor/connect-web": "^9.1.12",
     "ethereumjs-util": "^7.1.5",
     "hdkey": "0.8.0"
   },
@@ -61,7 +61,7 @@
     "prettier": "^2.3.0",
     "prettier-plugin-packagejson": "^2.2.12",
     "sinon": "^9.2.3",
-    "typescript": "^4.4.4"
+    "typescript": "5.3.3"
   },
   "engines": {
     "node": ">=12.0.0"
