@@ -93,6 +93,7 @@ class TrezorKeyring extends EventEmitter {
     if (!opts.bridge) {
       throw new Error('Bridge is required');
     }
+    this.bridge = opts.bridge;
     this.type = keyringType;
     this.accounts = [];
     this.hdk = new HDKey();
