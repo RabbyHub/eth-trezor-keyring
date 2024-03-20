@@ -1,25 +1,25 @@
 {
   "name": "@rabby-wallet/eth-trezor-keyring",
-  "version": "2.4.0",
-  "description": "A MetaMask compatible keyring, for trezor hardware wallets",
+  "version": "2.5.0-beta.4",
+  "description": "A RabbyHub compatible keyring, for trezor hardware wallets",
   "keywords": [
     "ethereum",
     "keyring",
     "trezor"
   ],
-  "homepage": "https://github.com/metamask/eth-trezor-keyring#readme",
+  "homepage": "https://github.com/RabbyHub/eth-trezor-keyring#readme",
   "bugs": {
-    "url": "https://github.com/metamask/eth-trezor-keyring/issues"
+    "url": "https://github.com/RabbyHub/eth-trezor-keyring/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/metamask/eth-trezor-keyring.git"
+    "url": "https://github.com/RabbyHub/eth-trezor-keyring.git"
   },
   "license": "ISC",
-  "author": "Bruno Barbieri",
+  "author": "rabbyhub",
   "main": "dist/index.js",
   "files": [
-    "index.js"
+    "dist"
   ],
   "scripts": {
     "build": "tsc",

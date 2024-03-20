@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
+    "baseUrl": "./src",
     "target": "es6",
     "module": "CommonJS",
     "moduleResolution": "node",
@@ -10,7 +10,8 @@
     "allowJs": true,
     "outDir": "./dist",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "declaration": true
   },
   "exclude": ["./node_modules", "test", "dist"]
 }

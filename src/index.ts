@@ -2,8 +2,8 @@ import { EventEmitter } from 'events';
 import * as ethUtil from 'ethereumjs-util';
 import { TransactionFactory } from '@ethereumjs/tx';
 import HDKey from 'hdkey';
-import TrezorConnect from '@trezor/connect-web';
 import transformTypedData from '@trezor/connect-plugin-ethereum';
+import { TrezorBridgeInterface } from './trezor-bridge-interface';
 
 const hdPathString = `m/44'/60'/0'/0`;
 const SLIP0044TestnetPath = `m/44'/1'/0'/0`;
@@ -81,13 +81,19 @@ class TrezorKeyring extends EventEmitter {
   unlockedAccount = 0;
   paths = {};
   hdPath = '';
-  model: string = '';
   accountDetails: Record<string, AccountDetail>;
-  trezorConnectInitiated: boolean;
-  connectDevices: Set<string>;
+  bridge!: TrezorBridgeInterface;
 
-  constructor(opts = {}) {
+  constructor(
+    opts: any & {
+      bridge: TrezorBridgeInterface;
+    } = {},
+  ) {
     super();
+    if (!opts.bridge) {
+      throw new Error('Bridge is required');
+    }
+    this.bridge = opts.bridge;
     this.type = keyringType;
     this.accounts = [];
     this.hdk = new HDKey();
@@ -96,29 +102,17 @@ class TrezorKeyring extends EventEmitter {
     this.unlockedAccount = 0;
     this.paths = {};
     this.deserialize(opts);
-    this.trezorConnectInitiated = false;
     this.accountDetails = {};
-    this.connectDevices = new Set<string>();
 
-    TrezorConnect.on('DEVICE_EVENT', (event: any) => {
-      if (event && event.payload && event.payload.features) {
-        this.model = event.payload.features.model;
-      }
-      const currentDeviceId = event.payload?.id;
-      if (event.type === 'device-connect') {
-        this.connectDevices.add(currentDeviceId);
-        this.cleanUp(true);
-      }
-      if (event.type === 'device-disconnect') {
-        this.connectDevices.delete(currentDeviceId);
-        this.cleanUp(true);
-      }
+    this.init();
+  }
+
+  init() {
+    this.bridge.init({
+      manifest: TREZOR_CONNECT_MANIFEST,
+      lazyLoad: true,
     });
-
-    if (!this.trezorConnectInitiated) {
-      TrezorConnect.init({ manifest: TREZOR_CONNECT_MANIFEST, lazyLoad: true });
-      this.trezorConnectInitiated = true;
-    }
+    this.bridge.event.on('cleanUp', this.cleanUp);
   }
 
   /**
@@ -128,21 +122,21 @@ class TrezorKeyring extends EventEmitter {
    * @returns {"T" | "1" | undefined}
    */
   getModel() {
-    return this.model;
+    return this.bridge.model;
   }
 
   dispose() {
     // This removes the Trezor Connect iframe from the DOM
     // This method is not well documented, but the code it calls can be seen
     // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
-    TrezorConnect.dispose();
+    this.bridge.dispose();
   }
 
   cleanUp(force = false) {
     if (!this.hdk) {
       return;
     }
-    if (force || this.connectDevices.size > 1) {
+    if (force || this.bridge.connectDevices.size > 1) {
       this.hdk = new HDKey();
     }
   }
@@ -178,10 +172,11 @@ class TrezorKeyring extends EventEmitter {
       return Promise.resolve('already unlocked');
     }
     return new Promise((resolve, reject) => {
-      TrezorConnect.getPublicKey({
-        path: this.hdPath,
-        coin: 'ETH',
-      })
+      this.bridge
+        .getPublicKey({
+          path: this.hdPath,
+          coin: 'ETH',
+        })
         .then((response) => {
           if (response.success) {
             this.hdk.publicKey = Buffer.from(response.payload.publicKey, 'hex');
@@ -412,7 +407,7 @@ class TrezorKeyring extends EventEmitter {
     try {
       const status = await this.unlock();
       await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
-      const response = await TrezorConnect.ethereumSignTransaction({
+      const response = await this.bridge.ethereumSignTransaction({
         path: this._pathFromAddress(address),
         transaction,
       });
@@ -450,11 +445,12 @@ class TrezorKeyring extends EventEmitter {
         .then((status) => {
           setTimeout(
             (_) => {
-              TrezorConnect.ethereumSignMessage({
-                path: this._pathFromAddress(withAccount),
-                message: ethUtil.stripHexPrefix(message),
-                hex: true,
-              })
+              this.bridge
+                .ethereumSignMessage({
+                  path: this._pathFromAddress(withAccount),
+                  message: ethUtil.stripHexPrefix(message),
+                  hex: true,
+                })
                 .then((response) => {
                   if (response.success) {
                     if (
@@ -514,7 +510,7 @@ class TrezorKeyring extends EventEmitter {
     // between the unlock & sign trezor popups
     const status = await this.unlock();
     await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
-    const response = await TrezorConnect.ethereumSignTypedData({
+    const response = await this.bridge.ethereumSignTypedData({
       path: this._pathFromAddress(address),
       data: {
         types: { EIP712Domain, ...otherTypes },
