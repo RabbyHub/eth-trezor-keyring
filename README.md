@@ -29,7 +29,7 @@ there are a few others:
 
 - **getNextPage** : returns the next ordered set of accounts from the TREZOR account based on the current page
 
-- **getPreviousPage** : returns the previous ordered set of accounts from the TREZOR account based on the current page
+- **getPreviousPage** : returns the previously ordered set of accounts from the TREZOR account based on the current page
 
 - **forgetDevice** : removes all the device info from memory so the next interaction with the keyring will prompt the user to connect the TREZOR device and export the account information
 
