@@ -205,17 +205,16 @@ class TrezorKeyring extends EventEmitter {
     }
     return new Promise((resolve, reject) => {
       const hdPaths: string[] = [];
+      hdPaths.push(this.hdPath);
+
       if (
         typeof start === 'number' &&
         typeof len === 'number' &&
         this.hdPath === HD_PATH_BASE.LedgerLive
       ) {
-        hdPaths.push(this._getPathForIndex(0));
         for (let i = start; i < start + len; i++) {
           hdPaths.push(this._getPathForIndex(i));
         }
-      } else {
-        hdPaths.push(this.hdPath);
       }
       const bundle = hdPaths.map((path) => ({ path, coin: 'ETH' }));
 
@@ -671,18 +670,35 @@ class TrezorKeyring extends EventEmitter {
 
       const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
 
-      if (detail?.hdPathBasePublicKey !== currentPublicKey) {
+      if (detail?.hdPathBasePublicKey === currentPublicKey) {
+        try {
+          const account = {
+            address,
+            index: this.indexFromAddress(address) + 1,
+          };
+          accounts.push(account);
+        } catch (e) {
+          console.log('address not found', address);
+        }
         continue;
       }
 
-      try {
-        const account = {
-          address,
-          index: this.indexFromAddress(address) + 1,
-        };
-        accounts.push(account);
-      } catch (e) {
-        console.log('address not found', address);
+      // Live and BIP44 first account is the same
+      // we need to check the first account when the path type is LedgerLive or BIP44
+      const hdPathType = this.getCurrentUsedHDPathType();
+      if (
+        hdPathType !== LedgerHDPathType.Legacy &&
+        (detail.hdPathType === LedgerHDPathType.LedgerLive ||
+          detail.hdPathType === LedgerHDPathType.BIP44)
+      ) {
+        const info = this.getAccountInfo(address);
+        if (info?.index === 1) {
+          const firstAddress = this._addressFromIndex(pathBase, 0);
+
+          if (isSameAddress(firstAddress, address)) {
+            accounts.push(info);
+          }
+        }
       }
     }
 
@@ -697,7 +713,6 @@ class TrezorKeyring extends EventEmitter {
     } else {
       hdk = this.hdkMap.get(this.hdPath);
     }
-    console.log('hdk', hdk);
     return hdk.publicKey.toString('hex');
   }
 
