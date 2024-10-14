@@ -58,10 +58,6 @@ interface AccountDetail {
   index: number;
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * @typedef {import('@ethereumjs/tx').TypedTransaction} TypedTransaction
  * @typedef {InstanceType<import("ethereumjs-tx")>} OldEthJsTransaction
@@ -253,6 +249,9 @@ class TrezorKeyring extends EventEmitter {
     return this.hdPath === "m/44'/60'/0'/0/0";
   }
   _getPathForIndex(index: number) {
+    if (index === undefined || index === null) {
+      return '';
+    }
     // Check if the path is BIP 44 (Ledger Live)
     return this._isLedgerLiveHdPath()
       ? `m/44'/60'/${index}'/0/0`
@@ -465,7 +464,7 @@ class TrezorKeyring extends EventEmitter {
 
     try {
       const response = await this.bridge.ethereumSignTransaction({
-        path: this.getHdPath(address),
+        path: await this.getHdPath(address),
         transaction,
       });
       if (response.success) {
@@ -496,43 +495,36 @@ class TrezorKeyring extends EventEmitter {
   }
 
   // For personal_sign, we need to prefix the message:
-  signPersonalMessage(withAccount, message) {
-    return new Promise((resolve, reject) => {
-      this.bridge
-        .ethereumSignMessage({
-          path: this.getHdPath(withAccount),
-          message: ethUtil.stripHexPrefix(message),
-          hex: true,
-        })
-        .then((response) => {
-          if (response.success) {
-            if (
-              response.payload.address !==
-              ethUtil.toChecksumAddress(withAccount)
-            ) {
-              reject(new Error('signature doesnt match the right address'));
-            }
-            const signature = `0x${response.payload.signature}`;
-            resolve(signature);
-          } else {
-            reject(
-              new Error(
-                (response.payload && response.payload.error) || 'Unknown error',
-              ),
-            );
-          }
-        })
-        .catch((e) => {
-          reject(new Error((e && e.toString()) || 'Unknown error'));
-        });
-    });
+  async signPersonalMessage(withAccount, message) {
+    try {
+      const response = await this.bridge.ethereumSignMessage({
+        path: await this.getHdPath(withAccount),
+        message: ethUtil.stripHexPrefix(message),
+        hex: true,
+      });
+
+      if (response.success) {
+        if (
+          response.payload.address !== ethUtil.toChecksumAddress(withAccount)
+        ) {
+          throw new Error('signature doesnt match the right address');
+        }
+        const signature = `0x${response.payload.signature}`;
+        return signature;
+      } else {
+        throw new Error(
+          (response.payload && response.payload.error) || 'Unknown error',
+        );
+      }
+    } catch (e: any) {
+      throw new Error((e && e.toString()) || 'Unknown error');
+    }
   }
 
   /**
    * EIP-712 Sign Typed Data
    */
   async signTypedData(address, data, { version }) {
-    await wait(500);
     const dataWithHashes = transformTypedData(data, version === 'V4');
 
     // set default values for signTypedData
@@ -550,7 +542,7 @@ class TrezorKeyring extends EventEmitter {
     // This is necessary to avoid popup collision
     // between the unlock & sign trezor popups
     const response = await this.bridge.ethereumSignTypedData({
-      path: this.getHdPath(address),
+      path: await this.getHdPath(address),
       data: {
         types: { EIP712Domain, ...otherTypes },
         message,
@@ -774,13 +766,22 @@ class TrezorKeyring extends EventEmitter {
     }
   }
 
-  getHdPath(address: string) {
+  async getHdPath(address: string) {
     const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
     if (detail) {
       return detail.hdPath;
     }
 
-    return this._getPathForIndex(this.paths[address]);
+    const path = this._getPathForIndex(this.paths[address]);
+
+    if (path) {
+      return path;
+    }
+
+    // old accounts not stored in paths and only support bip44
+    this.setHdPath(HD_PATH_BASE.BIP44);
+    await this.unlock();
+    return `${this.hdPath}/${this.indexFromAddress(address)}`;
   }
 }
 

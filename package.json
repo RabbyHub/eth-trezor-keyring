@@ -1,6 +1,6 @@
 {
   "name": "@rabby-wallet/eth-trezor-keyring",
-  "version": "2.5.1",
+  "version": "2.6.1",
   "description": "A RabbyHub compatible keyring, for trezor hardware wallets",
   "keywords": [
     "ethereum",
