@@ -1,6 +1,15 @@
 import { EventEmitter } from 'events';
-import * as ethUtil from 'ethereumjs-util';
-import { TransactionFactory } from '@ethereumjs/tx';
+import {
+  FeeMarketEIP1559Transaction,
+  LegacyTransaction,
+  TransactionFactory,
+} from '@ethereumjs/tx';
+import {
+  bytesToHex,
+  toChecksumAddress,
+  addHexPrefix,
+  stripHexPrefix,
+} from '@ethereumjs/util';
 import HDKey from 'hdkey';
 import transformTypedData from '@trezor/connect-plugin-ethereum';
 import { TrezorBridgeInterface } from './trezor-bridge-interface';
@@ -269,7 +278,7 @@ class TrezorKeyring extends EventEmitter {
             const address = this._addressFromIndex(pathBase, i);
             if (!this.accounts.includes(address)) {
               this.accounts.push(address);
-              this.accountDetails[ethUtil.toChecksumAddress(address)] = {
+              this.accountDetails[toChecksumAddress(address)] = {
                 hdPath: this._getPathForIndex(i),
                 hdPathType: this.getCurrentUsedHDPathType(),
                 hdPathBasePublicKey: this.getPathBasePublicKey(),
@@ -315,7 +324,7 @@ class TrezorKeyring extends EventEmitter {
               balance: null,
               index: i + 1,
             });
-            this.paths[ethUtil.toChecksumAddress(address)] = i;
+            this.paths[toChecksumAddress(address)] = i;
           }
           resolve(accounts);
         })
@@ -347,7 +356,7 @@ class TrezorKeyring extends EventEmitter {
               balance: null,
               index: i + 1,
             });
-            this.paths[ethUtil.toChecksumAddress(address)] = i;
+            this.paths[toChecksumAddress(address)] = i;
           }
           resolve(accounts);
         })
@@ -371,7 +380,7 @@ class TrezorKeyring extends EventEmitter {
     this.accounts = this.accounts.filter(
       (a) => a.toLowerCase() !== address.toLowerCase(),
     );
-    const checksummedAddress = ethUtil.toChecksumAddress(address);
+    const checksummedAddress = toChecksumAddress(address);
     delete this.accountDetails[checksummedAddress];
     delete this.paths[checksummedAddress];
   }
@@ -388,20 +397,10 @@ class TrezorKeyring extends EventEmitter {
    * @returns {Promise<Transaction>} The signed transaction, an instance of either new-style or old-style
    * ethereumjs transaction.
    */
-  signTransaction(address, tx) {
-    if (isOldStyleEthereumjsTx(tx)) {
-      // In this version of ethereumjs-tx we must add the chainId in hex format
-      // to the initial v value. The chainId must be included in the serialized
-      // transaction which is only communicated to ethereumjs-tx in this
-      // value. In newer versions the chainId is communicated via the 'Common'
-      // object.
-      return this._signTransaction(address, tx.getChainId(), tx, (payload) => {
-        tx.v = Buffer.from(payload.v, 'hex');
-        tx.r = Buffer.from(payload.r, 'hex');
-        tx.s = Buffer.from(payload.s, 'hex');
-        return tx;
-      });
-    }
+  signTransaction(
+    address,
+    tx: FeeMarketEIP1559Transaction | LegacyTransaction,
+  ) {
     return this._signTransaction(
       address,
       Number(tx.common.chainId()),
@@ -412,11 +411,11 @@ class TrezorKeyring extends EventEmitter {
         // nomenclature of ethereumjs/tx.
         const txData = tx.toJSON();
         // The fromTxData utility expects a type to support transactions with a type other than 0
-        txData.type = tx.type;
+        txData.type = `0x${tx.type.toString(16)}`;
         // The fromTxData utility expects v,r and s to be hex prefixed
-        txData.v = ethUtil.addHexPrefix(payload.v);
-        txData.r = ethUtil.addHexPrefix(payload.r);
-        txData.s = ethUtil.addHexPrefix(payload.s);
+        txData.v = addHexPrefix(payload.v) as `0x${string}`;
+        txData.r = addHexPrefix(payload.r) as `0x${string}`;
+        txData.s = addHexPrefix(payload.s) as `0x${string}`;
         // Adopt the 'common' option from the original transaction and set the
         // returned object to be frozen if the original is frozen.
         return TransactionFactory.fromTxData(txData, {
@@ -438,44 +437,32 @@ class TrezorKeyring extends EventEmitter {
    * @returns {Promise<Transaction>} The signed transaction, an instance of either new-style or old-style
    * ethereumjs transaction.
    */
-  async _signTransaction(address, chainId, tx, handleSigning) {
-    let transaction;
-    if (isOldStyleEthereumjsTx(tx)) {
-      // legacy transaction from ethereumjs-tx package has no .toJSON() function,
-      // so we need to convert to hex-strings manually manually
-      transaction = {
-        to: this._normalize(tx.to),
-        value: this._normalize(tx.value),
-        data: this._normalize(tx.data),
-        chainId,
-        nonce: this._normalize(tx.nonce),
-        gasLimit: this._normalize(tx.gasLimit),
-        gasPrice: this._normalize(tx.gasPrice),
-      };
-    } else {
-      // new-style transaction from @ethereumjs/tx package
-      // we can just copy tx.toJSON() for everything except chainId, which must be a number
-      transaction = {
-        ...tx.toJSON(),
-        chainId,
-        to: this._normalize(tx.to),
-      };
-    }
+  async _signTransaction(
+    address,
+    chainId,
+    tx: FeeMarketEIP1559Transaction | LegacyTransaction,
+    handleSigning,
+  ) {
+    // new-style transaction from @ethereumjs/tx package
+    // we can just copy tx.toJSON() for everything except chainId, which must be a number
+    const transaction = {
+      ...tx.toJSON(),
+      chainId,
+      to: tx.to?.toString(),
+    };
 
     try {
       const response = await this.bridge.ethereumSignTransaction({
         path: await this.getHdPath(address),
-        transaction,
+        transaction: transaction as any,
       });
       if (response.success) {
         const newOrMutatedTx = handleSigning(response.payload);
 
-        const addressSignedWith = ethUtil.toChecksumAddress(
-          ethUtil.addHexPrefix(
-            newOrMutatedTx.getSenderAddress().toString('hex'),
-          ),
+        const addressSignedWith = toChecksumAddress(
+          addHexPrefix(newOrMutatedTx.getSenderAddress().toString('hex')),
         );
-        const correctAddress = ethUtil.toChecksumAddress(address);
+        const correctAddress = toChecksumAddress(address);
         if (addressSignedWith !== correctAddress) {
           throw new Error("signature doesn't match the right address");
         }
@@ -499,14 +486,12 @@ class TrezorKeyring extends EventEmitter {
     try {
       const response = await this.bridge.ethereumSignMessage({
         path: await this.getHdPath(withAccount),
-        message: ethUtil.stripHexPrefix(message),
+        message: stripHexPrefix(message),
         hex: true,
       });
 
       if (response.success) {
-        if (
-          response.payload.address !== ethUtil.toChecksumAddress(withAccount)
-        ) {
+        if (response.payload.address !== toChecksumAddress(withAccount)) {
           throw new Error('signature doesnt match the right address');
         }
         const signature = `0x${response.payload.signature}`;
@@ -556,7 +541,7 @@ class TrezorKeyring extends EventEmitter {
     } as any);
 
     if (response.success) {
-      if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
+      if (toChecksumAddress(address) !== response.payload.address) {
         throw new Error('signature doesnt match the right address');
       }
       return response.payload.signature;
@@ -608,8 +593,8 @@ class TrezorKeyring extends EventEmitter {
 
   /* PRIVATE METHODS */
 
-  _normalize(buf) {
-    return ethUtil.bufferToHex(buf).toString();
+  _normalize(buf: Uint8Array) {
+    return bytesToHex(buf);
   }
 
   // eslint-disable-next-line no-shadow
@@ -625,11 +610,11 @@ class TrezorKeyring extends EventEmitter {
     const address = ethUtil
       .publicToAddress(dkey.publicKey, true)
       .toString('hex');
-    return ethUtil.toChecksumAddress(`0x${address}`);
+    return toChecksumAddress(`0x${address}`);
   }
 
   indexFromAddress(address: string) {
-    const checksummedAddress = ethUtil.toChecksumAddress(address);
+    const checksummedAddress = toChecksumAddress(address);
     let index =
       this.paths[checksummedAddress] ||
       this.accountDetails[checksummedAddress]?.index;
@@ -660,7 +645,7 @@ class TrezorKeyring extends EventEmitter {
       const address = addresses[i];
       await this._fixAccountDetail(address);
 
-      const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
+      const detail = this.accountDetails[toChecksumAddress(address)];
 
       if (detail?.hdPathBasePublicKey === currentPublicKey) {
         try {
@@ -709,7 +694,7 @@ class TrezorKeyring extends EventEmitter {
   }
 
   private async _fixAccountDetail(address: string) {
-    const checksummedAddress = ethUtil.toChecksumAddress(address);
+    const checksummedAddress = toChecksumAddress(address);
     const detail = this.accountDetails[checksummedAddress];
 
     // The detail is already fixed
@@ -753,7 +738,7 @@ class TrezorKeyring extends EventEmitter {
   }
 
   getAccountInfo(address: string) {
-    const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
+    const detail = this.accountDetails[toChecksumAddress(address)];
     if (detail) {
       const { hdPath, hdPathType, hdPathBasePublicKey } = detail;
       return {
@@ -767,7 +752,7 @@ class TrezorKeyring extends EventEmitter {
   }
 
   async getHdPath(address: string) {
-    const detail = this.accountDetails[ethUtil.toChecksumAddress(address)];
+    const detail = this.accountDetails[toChecksumAddress(address)];
     if (detail) {
       return detail.hdPath;
     }
