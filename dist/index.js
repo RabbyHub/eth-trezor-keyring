@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -48,7 +25,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LedgerHDPathType = void 0;
 const events_1 = require("events");
-const ethUtil = __importStar(require("ethereumjs-util"));
 const tx_1 = require("@ethereumjs/tx");
 const util_1 = require("@ethereumjs/util");
 const hdkey_1 = __importDefault(require("hdkey"));
@@ -87,26 +63,6 @@ const ALLOWED_HD_PATHS = {
     [HD_PATH_BASE.LedgerLive]: true,
     [SLIP0044TestnetPath]: true,
 };
-/**
- * @typedef {import('@ethereumjs/tx').TypedTransaction} TypedTransaction
- * @typedef {InstanceType<import("ethereumjs-tx")>} OldEthJsTransaction
- */
-/**
- * Check if the given transaction is made with ethereumjs-tx or @ethereumjs/tx
- *
- * Transactions built with older versions of ethereumjs-tx have a
- * getChainId method that newer versions do not.
- * Older versions are mutable
- * while newer versions default to being immutable.
- * Expected shape and type
- * of data for v, r and s differ (Buffer (old) vs BN (new)).
- *
- * @param {TypedTransaction | OldEthJsTransaction} tx
- * @returns {tx is OldEthJsTransaction} Returns `true` if tx is an old-style ethereumjs-tx transaction.
- */
-function isOldStyleEthereumjsTx(tx) {
-    return typeof tx.getChainId === 'function';
-}
 class TrezorKeyring extends events_1.EventEmitter {
     constructor(opts = {}) {
         super();
@@ -521,7 +477,7 @@ class TrezorKeyring extends events_1.EventEmitter {
     }
     /* PRIVATE METHODS */
     _normalize(buf) {
-        return (0, util_1.bytesToHex)(buf);
+        return (0, util_1.bufferToHex)(buf);
     }
     // eslint-disable-next-line no-shadow
     _addressFromIndex(pathBase, i) {
@@ -534,9 +490,7 @@ class TrezorKeyring extends events_1.EventEmitter {
             const hdk = this.hdkMap.get(this.hdPath);
             dkey = hdk.derive(`${pathBase}/${i}`);
         }
-        const address = ethUtil
-            .publicToAddress(dkey.publicKey, true)
-            .toString('hex');
+        const address = (0, util_1.publicToAddress)(dkey.publicKey, true).toString('hex');
         return (0, util_1.toChecksumAddress)(`0x${address}`);
     }
     indexFromAddress(address) {
