@@ -364,7 +364,7 @@ class TrezorKeyring extends events_1.EventEmitter {
                 });
                 if (response.success) {
                     const newOrMutatedTx = handleSigning(response.payload);
-                    const addressSignedWith = (0, util_1.toChecksumAddress)((0, util_1.addHexPrefix)(newOrMutatedTx.getSenderAddress().toString('hex')));
+                    const addressSignedWith = (0, util_1.toChecksumAddress)((0, util_1.addHexPrefix)(newOrMutatedTx.getSenderAddress().toString()));
                     const correctAddress = (0, util_1.toChecksumAddress)(address);
                     if (addressSignedWith !== correctAddress) {
                         throw new Error("signature doesn't match the right address");
