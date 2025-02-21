@@ -1,14 +1,11 @@
 import { EventEmitter } from 'events';
+import { Transaction, TransactionFactory } from '@ethereumjs/tx';
 import {
-  FeeMarketEIP1559Transaction,
-  LegacyTransaction,
-  TransactionFactory,
-} from '@ethereumjs/tx';
-import {
-  bytesToHex,
   toChecksumAddress,
   addHexPrefix,
   stripHexPrefix,
+  bufferToHex,
+  publicToAddress,
 } from '@ethereumjs/util';
 import HDKey from 'hdkey';
 import transformTypedData from '@trezor/connect-plugin-ethereum';
@@ -65,28 +62,6 @@ interface AccountDetail {
   hdPath: string;
   hdPathType: HDPathType;
   index: number;
-}
-
-/**
- * @typedef {import('@ethereumjs/tx').TypedTransaction} TypedTransaction
- * @typedef {InstanceType<import("ethereumjs-tx")>} OldEthJsTransaction
- */
-
-/**
- * Check if the given transaction is made with ethereumjs-tx or @ethereumjs/tx
- *
- * Transactions built with older versions of ethereumjs-tx have a
- * getChainId method that newer versions do not.
- * Older versions are mutable
- * while newer versions default to being immutable.
- * Expected shape and type
- * of data for v, r and s differ (Buffer (old) vs BN (new)).
- *
- * @param {TypedTransaction | OldEthJsTransaction} tx
- * @returns {tx is OldEthJsTransaction} Returns `true` if tx is an old-style ethereumjs-tx transaction.
- */
-function isOldStyleEthereumjsTx(tx) {
-  return typeof tx.getChainId === 'function';
 }
 
 class TrezorKeyring extends EventEmitter {
@@ -397,10 +372,7 @@ class TrezorKeyring extends EventEmitter {
    * @returns {Promise<Transaction>} The signed transaction, an instance of either new-style or old-style
    * ethereumjs transaction.
    */
-  signTransaction(
-    address,
-    tx: FeeMarketEIP1559Transaction | LegacyTransaction,
-  ) {
+  signTransaction(address, tx: Transaction) {
     return this._signTransaction(
       address,
       Number(tx.common.chainId()),
@@ -437,12 +409,7 @@ class TrezorKeyring extends EventEmitter {
    * @returns {Promise<Transaction>} The signed transaction, an instance of either new-style or old-style
    * ethereumjs transaction.
    */
-  async _signTransaction(
-    address,
-    chainId,
-    tx: FeeMarketEIP1559Transaction | LegacyTransaction,
-    handleSigning,
-  ) {
+  async _signTransaction(address, chainId, tx: Transaction, handleSigning) {
     // new-style transaction from @ethereumjs/tx package
     // we can just copy tx.toJSON() for everything except chainId, which must be a number
     const transaction = {
@@ -593,8 +560,8 @@ class TrezorKeyring extends EventEmitter {
 
   /* PRIVATE METHODS */
 
-  _normalize(buf: Uint8Array) {
-    return bytesToHex(buf);
+  _normalize(buf: Buffer) {
+    return bufferToHex(buf);
   }
 
   // eslint-disable-next-line no-shadow
@@ -607,9 +574,7 @@ class TrezorKeyring extends EventEmitter {
       const hdk = this.hdkMap.get(this.hdPath);
       dkey = hdk.derive(`${pathBase}/${i}`);
     }
-    const address = ethUtil
-      .publicToAddress(dkey.publicKey, true)
-      .toString('hex');
+    const address = publicToAddress(dkey.publicKey, true).toString('hex');
     return toChecksumAddress(`0x${address}`);
   }
 

@@ -34,8 +34,8 @@
     "mocha/mkdirp": "^0.5.1"
   },
   "dependencies": {
-    "@ethereumjs/tx": "5.4.0",
-    "@ethereumjs/util": "9.1.0",
+    "@ethereumjs/tx": "4.1.1",
+    "@ethereumjs/util": "8.0.5",
     "@metamask/eth-sig-util": "5.0.2",
     "@trezor/connect-plugin-ethereum": "^9.0.3",
     "@trezor/connect-web": "^9.2.1",
