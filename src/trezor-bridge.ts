@@ -30,7 +30,10 @@ export default class TrezorBridge implements TrezorBridgeInterface {
     }
   };
 
-  dispose = TrezorConnect.dispose;
+  dispose = () => {
+    TrezorConnect.dispose();
+    return Promise.resolve();
+  };
 
   getPublicKey = TrezorConnect.getPublicKey;
 

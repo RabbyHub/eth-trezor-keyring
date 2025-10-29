@@ -41,7 +41,10 @@ class TrezorBridge {
                 this.isDeviceConnected = true;
             }
         });
-        this.dispose = connect_web_1.default.dispose;
+        this.dispose = () => {
+            connect_web_1.default.dispose();
+            return Promise.resolve();
+        };
         this.getPublicKey = connect_web_1.default.getPublicKey;
         this.ethereumSignTransaction = connect_web_1.default.ethereumSignTransaction;
         this.ethereumSignMessage = connect_web_1.default.ethereumSignMessage;
