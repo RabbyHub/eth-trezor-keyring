@@ -2,40 +2,41 @@ import EventEmitter from 'events';
 import { TrezorBridgeInterface } from './trezor-bridge-interface';
 import TrezorConnect from '@trezor/connect-web';
 
+// Connect 10 is a thin client: the core, device selection and its events live
+// in Trezor Suite, so there is no DEVICE_EVENT to track the model or connected
+// devices from here.
 export default class TrezorBridge implements TrezorBridgeInterface {
   isDeviceConnected = false;
   model = '';
   connectDevices = new Set<string>();
   event = new EventEmitter();
 
+  private initialization?: Promise<void>;
+
   init: TrezorBridgeInterface['init'] = async (config) => {
-    TrezorConnect.on('DEVICE_EVENT', (event: any) => {
-      if (event && event.payload && event.payload.features) {
-        this.model = event.payload.features.model;
-      }
-      const currentDeviceId = event.payload?.id;
-      if (event.type === 'device-connect') {
-        this.connectDevices.add(currentDeviceId);
-        this.event.emit('cleanUp', true);
-      }
-      if (event.type === 'device-disconnect') {
-        this.connectDevices.delete(currentDeviceId);
-        this.event.emit('cleanUp', true);
-      }
-    });
-
-    if (!this.isDeviceConnected) {
-      TrezorConnect.init(config);
-      this.isDeviceConnected = true;
+    if (!this.initialization) {
+      const attempt = TrezorConnect.init(config);
+      this.initialization = attempt;
+      attempt.catch(() => {
+        if (this.initialization === attempt) {
+          this.initialization = undefined;
+          this.isDeviceConnected = false;
+        }
+      });
     }
+    await this.initialization;
+    this.isDeviceConnected = true;
   };
 
-  dispose = () => {
-    TrezorConnect.dispose();
-    return Promise.resolve();
+  dispose = async () => {
+    this.initialization = undefined;
+    this.isDeviceConnected = false;
+    await TrezorConnect.dispose();
   };
 
-  getPublicKey = TrezorConnect.getPublicKey;
+  // factoryPublic installs these as arrow functions on the instance, so they
+  // stay bound when copied off it.
+  ethereumGetPublicKey = TrezorConnect.ethereumGetPublicKey;
 
   ethereumSignTransaction = TrezorConnect.ethereumSignTransaction;
 

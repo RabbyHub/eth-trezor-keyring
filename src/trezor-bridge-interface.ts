@@ -1,5 +1,10 @@
-import type { TrezorConnect } from '@trezor/connect-web';
+import type {
+  ConnectDynamicSettings,
+  TrezorConnectPublicAPI,
+} from '@trezor/connect-web';
 import EventEmitter from 'events';
+
+type TrezorConnect = TrezorConnectPublicAPI<ConnectDynamicSettings>;
 
 export interface TrezorBridgeInterface {
   event: EventEmitter;
@@ -8,7 +13,7 @@ export interface TrezorBridgeInterface {
   connectDevices: Set<string>;
   init: TrezorConnect['init'];
   dispose: () => Promise<void>;
-  getPublicKey: TrezorConnect['getPublicKey'];
+  ethereumGetPublicKey: TrezorConnect['ethereumGetPublicKey'];
   ethereumSignTransaction: TrezorConnect['ethereumSignTransaction'];
   ethereumSignMessage: TrezorConnect['ethereumSignMessage'];
   ethereumSignTypedData: TrezorConnect['ethereumSignTypedData'];

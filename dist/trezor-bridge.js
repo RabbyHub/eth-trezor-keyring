@@ -14,6 +14,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = __importDefault(require("events"));
 const connect_web_1 = __importDefault(require("@trezor/connect-web"));
+// Connect 10 is a thin client: the core, device selection and its events live
+// in Trezor Suite, so there is no DEVICE_EVENT to track the model or connected
+// devices from here.
 class TrezorBridge {
     constructor() {
         this.isDeviceConnected = false;
@@ -21,31 +24,27 @@ class TrezorBridge {
         this.connectDevices = new Set();
         this.event = new events_1.default();
         this.init = (config) => __awaiter(this, void 0, void 0, function* () {
-            connect_web_1.default.on('DEVICE_EVENT', (event) => {
-                var _a;
-                if (event && event.payload && event.payload.features) {
-                    this.model = event.payload.features.model;
-                }
-                const currentDeviceId = (_a = event.payload) === null || _a === void 0 ? void 0 : _a.id;
-                if (event.type === 'device-connect') {
-                    this.connectDevices.add(currentDeviceId);
-                    this.event.emit('cleanUp', true);
-                }
-                if (event.type === 'device-disconnect') {
-                    this.connectDevices.delete(currentDeviceId);
-                    this.event.emit('cleanUp', true);
-                }
-            });
-            if (!this.isDeviceConnected) {
-                connect_web_1.default.init(config);
-                this.isDeviceConnected = true;
+            if (!this.initialization) {
+                const attempt = connect_web_1.default.init(config);
+                this.initialization = attempt;
+                attempt.catch(() => {
+                    if (this.initialization === attempt) {
+                        this.initialization = undefined;
+                        this.isDeviceConnected = false;
+                    }
+                });
             }
+            yield this.initialization;
+            this.isDeviceConnected = true;
         });
-        this.dispose = () => {
-            connect_web_1.default.dispose();
-            return Promise.resolve();
-        };
-        this.getPublicKey = connect_web_1.default.getPublicKey;
+        this.dispose = () => __awaiter(this, void 0, void 0, function* () {
+            this.initialization = undefined;
+            this.isDeviceConnected = false;
+            yield connect_web_1.default.dispose();
+        });
+        // factoryPublic installs these as arrow functions on the instance, so they
+        // stay bound when copied off it.
+        this.ethereumGetPublicKey = connect_web_1.default.ethereumGetPublicKey;
         this.ethereumSignTransaction = connect_web_1.default.ethereumSignTransaction;
         this.ethereumSignMessage = connect_web_1.default.ethereumSignMessage;
         this.ethereumSignTypedData = connect_web_1.default.ethereumSignTypedData;
