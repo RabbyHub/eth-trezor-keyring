@@ -12,7 +12,6 @@ import {
   publicToAddress,
 } from '@ethereumjs/util';
 import HDKey from 'hdkey';
-import transformTypedData from '@trezor/connect-plugin-ethereum';
 import { TrezorBridgeInterface } from './trezor-bridge-interface';
 
 const SLIP0044TestnetPath = `m/44'/1'/0'/0`;
@@ -26,6 +25,11 @@ const TREZOR_CONNECT_MANIFEST = {
   appName: 'Rabby Wallet',
   appUrl: 'https://rabby.io/',
 };
+
+// Connect 10 reports failures as `{ success: false, error: { message, code } }`;
+// keep reading the v9 `payload.error` shape as a fallback.
+const getResponseError = (response: any) =>
+  response?.error?.message || response?.payload?.error || 'Unknown error';
 
 const isSameAddress = (a: string, b: string) => {
   return a.toLowerCase() === b.toLowerCase();
@@ -81,6 +85,9 @@ class TrezorKeyring extends EventEmitter {
   hdPath = '';
   accountDetails: Record<string, AccountDetail>;
   bridge!: TrezorBridgeInterface;
+  // Suite picks the active device and wallet; remember which one the cached
+  // public keys came from so a switch in Suite drops them.
+  private deviceStateId?: string;
 
   constructor(
     opts: any & {
@@ -106,10 +113,14 @@ class TrezorKeyring extends EventEmitter {
   }
 
   init() {
-    this.bridge.init({
-      manifest: TREZOR_CONNECT_MANIFEST,
-      lazyLoad: true,
-    });
+    this.bridge
+      .init({
+        manifest: TREZOR_CONNECT_MANIFEST,
+        coreMode: 'auto',
+      })
+      .catch((e) => {
+        console.error('[TrezorKeyring] init failed', e);
+      });
     this.bridge.event.on('cleanUp', this.cleanUp);
   }
 
@@ -124,9 +135,6 @@ class TrezorKeyring extends EventEmitter {
   }
 
   dispose() {
-    // This removes the Trezor Connect iframe from the DOM
-    // This method is not well documented, but the code it calls can be seen
-    // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
     this.bridge.dispose();
   }
 
@@ -201,14 +209,22 @@ class TrezorKeyring extends EventEmitter {
           hdPaths.push(this._getPathForIndex(i));
         }
       }
-      const bundle = hdPaths.map((path) => ({ path, coin: 'ETH' }));
+      // Connect 10 restricts getPublicKey to bitcoin-like coins.
+      const bundle = hdPaths.map((path) => ({ path }));
 
       this.bridge
-        .getPublicKey({
+        .ethereumGetPublicKey({
           bundle,
         })
         .then((response) => {
           if (response.success) {
+            const stateId = response.device?.state?.staticSessionId;
+            if (stateId) {
+              if (this.deviceStateId && this.deviceStateId !== stateId) {
+                this.hdkMap = new Map();
+              }
+              this.deviceStateId = stateId;
+            }
             response.payload.forEach((item) => {
               const hdk = new HDKey();
               hdk.publicKey = Buffer.from(item.publicKey, 'hex');
@@ -217,11 +233,7 @@ class TrezorKeyring extends EventEmitter {
             });
             resolve('just unlocked');
           } else {
-            reject(
-              new Error(
-                (response.payload && response.payload.error) || 'Unknown error',
-              ),
-            );
+            reject(new Error(getResponseError(response)));
           }
         })
         .catch((e) => {
@@ -443,9 +455,7 @@ class TrezorKeyring extends EventEmitter {
 
         return newOrMutatedTx;
       }
-      throw new Error(
-        (response.payload && response.payload.error) || 'Unknown error',
-      );
+      throw new Error(getResponseError(response));
     } catch (e: any) {
       throw new Error((e && e.toString()) || 'Unknown error');
     }
@@ -471,9 +481,7 @@ class TrezorKeyring extends EventEmitter {
         const signature = `0x${response.payload.signature}`;
         return signature;
       } else {
-        throw new Error(
-          (response.payload && response.payload.error) || 'Unknown error',
-        );
+        throw new Error(getResponseError(response));
       }
     } catch (e: any) {
       throw new Error((e && e.toString()) || 'Unknown error');
@@ -484,7 +492,11 @@ class TrezorKeyring extends EventEmitter {
    * EIP-712 Sign Typed Data
    */
   async signTypedData(address, data, { version }) {
-    const dataWithHashes = transformTypedData(data, version === 'V4');
+    if (version !== 'V4') {
+      throw new Error(
+        'Trezor: Only version 4 of typed data signing is supported',
+      );
+    }
 
     // set default values for signTypedData
     // Trezor is stricter than @metamask/eth-sig-util in what it accepts
@@ -493,13 +505,10 @@ class TrezorKeyring extends EventEmitter {
       message = {},
       domain = {},
       primaryType,
-      // snake_case since Trezor uses Protobuf naming conventions here
-      domain_separator_hash, // eslint-disable-line camelcase
-      message_hash, // eslint-disable-line camelcase
-    } = dataWithHashes;
+    } = data;
 
-    // This is necessary to avoid popup collision
-    // between the unlock & sign trezor popups
+    // Connect 10 computes the domain/message hashes Trezor Model One needs
+    // itself, which used to come from @trezor/connect-plugin-ethereum.
     const response = await this.bridge.ethereumSignTypedData({
       path: await this.getHdPath(address),
       data: {
@@ -509,9 +518,6 @@ class TrezorKeyring extends EventEmitter {
         primaryType,
       },
       metamask_v4_compat: true,
-      // Trezor 1 only supports blindly signing hashes
-      domain_separator_hash,
-      message_hash,
     } as any);
 
     if (response.success) {
@@ -521,9 +527,7 @@ class TrezorKeyring extends EventEmitter {
       return response.payload.signature;
     }
 
-    throw new Error(
-      (response.payload && response.payload.error) || 'Unknown error',
-    );
+    throw new Error(getResponseError(response));
   }
 
   exportAccount() {
